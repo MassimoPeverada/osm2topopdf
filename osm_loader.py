@@ -22,6 +22,7 @@ KEY_TAGS = {
     "tourism",
     "aeroway",
     "waterway",
+    "water",
     "man_made",
     "tower:type",
     "ford",
@@ -39,7 +40,7 @@ KEY_TAGS = {
     "sport",
     "contour",
     "elevation",
-    "contour_ext"
+    "contour_ext",
 }
 
 
@@ -108,7 +109,91 @@ def _extract_relation_ways(rel_id, rel_map, visited=None):
   return result
 
 
-def _build_relation_polygons(members, ways_coords):
+def _close_open_segments_on_bbox(segments, utm_bbox):
+  if not segments or utm_bbox is None:
+    return []
+
+  merged = linemerge(segments)
+  if merged.is_empty:
+    return []
+  lines = [merged] if merged.geom_type == "LineString" else list(merged.geoms)
+
+  minx, miny, maxx, maxy = utm_bbox.bounds
+  diag = ((maxx - minx) ** 2 + (maxy - miny) ** 2) ** 0.5
+  ext_len = max(500.0, diag * 0.1)
+
+  clipped_lines = []
+  for ls in lines:
+    coords = list(ls.coords)
+    if len(coords) < 2:
+      continue
+    x0, y0 = coords[0]
+    x1, y1 = coords[1]
+    dx, dy = x0 - x1, y0 - y1
+    d = (dx * dx + dy * dy) ** 0.5
+    if d > 0 and utm_bbox.contains(Point(x0, y0)):
+      coords.insert(0, (x0 + (dx / d) * ext_len, y0 + (dy / d) * ext_len))
+
+    xn, yn = coords[-1]
+    xp, yp = coords[-2]
+    dx, dy = xn - xp, yn - yp
+    d = (dx * dx + dy * dy) ** 0.5
+    if d > 0 and utm_bbox.contains(Point(xn, yn)):
+      coords.append((xn + (dx / d) * ext_len, yn + (dy / d) * ext_len))
+
+    clipped = LineString(coords).intersection(utm_bbox)
+    if clipped.is_empty:
+      continue
+    if clipped.geom_type == "LineString":
+      clipped_lines.append(clipped)
+    elif clipped.geom_type == "MultiLineString":
+      clipped_lines.extend(clipped.geoms)
+
+  if not clipped_lines:
+    return []
+
+  left_probes = []
+  right_probes = []
+  inner_box = utm_bbox.buffer(-2.0)
+  for ls in lines:
+    in_box = ls.intersection(inner_box)
+    if in_box.is_empty:
+      continue
+    parts = [in_box] if in_box.geom_type == "LineString" else list(in_box.geoms)
+    for part in parts:
+      if part.length < 2.0:
+        continue
+      for frac in (0.25, 0.5, 0.75):
+        dist = part.length * frac
+        pt = part.interpolate(dist)
+        p_a = part.interpolate(max(0.0, dist - 0.5))
+        p_b = part.interpolate(min(part.length, dist + 0.5))
+        dx, dy = p_b.x - p_a.x, p_b.y - p_a.y
+        norm = (dx * dx + dy * dy) ** 0.5
+        if norm > 0:
+          nx, ny = -dy / norm, dx / norm
+          left_probes.append(Point(pt.x + nx * 1.5, pt.y + ny * 1.5))
+          right_probes.append(Point(pt.x - nx * 1.5, pt.y - ny * 1.5))
+
+  if not left_probes:
+    return []
+
+  network = unary_union(clipped_lines + [utm_bbox.boundary])
+  faces = list(polygonize(network))
+
+  selected = []
+  for face in faces:
+    if not face.is_valid or face.is_empty:
+      continue
+    has_left = any(face.contains(pt) for pt in left_probes)
+    has_right = any(face.contains(pt) for pt in right_probes)
+    if has_left and not has_right:
+      selected.append(face)
+
+  return selected
+
+
+def _build_relation_polygons(members, ways_coords, utm_bbox=None):
   outer_rings = []
   inner_rings = []
   outer_segments = []
@@ -121,6 +206,8 @@ def _build_relation_polygons(members, ways_coords):
     is_inner = role == "inner"
     if coords[:1] == coords[-1:] and len(coords) >= 4:
       poly = Polygon(coords)
+      if not poly.is_valid:
+        poly = poly.buffer(0)
       if poly.is_valid and not poly.is_empty:
         if is_inner:
           inner_rings.append(poly)
@@ -138,12 +225,16 @@ def _build_relation_polygons(members, ways_coords):
     for p in polygonize(merged_out):
       if p.is_valid and not p.is_empty:
         outer_rings.append(p)
+    if not outer_rings and utm_bbox is not None:
+      outer_rings.extend(_close_open_segments_on_bbox(outer_segments, utm_bbox))
 
   if inner_segments:
     merged_in = linemerge(inner_segments)
     for p in polygonize(merged_in):
       if p.is_valid and not p.is_empty:
         inner_rings.append(p)
+    if not inner_rings and utm_bbox is not None:
+      inner_rings.extend(_close_open_segments_on_bbox(inner_segments, utm_bbox))
 
   if not outer_rings:
     return None
@@ -156,10 +247,12 @@ def _build_relation_polygons(members, ways_coords):
     geom_final = geom_outer
 
   return geom_final if (geom_final and not geom_final.is_empty) else None
-
-
 def load_osm_data(
-    osm_file, utm_bbox, names_path="names.txt", utm_epsg="EPSG:32632"
+    osm_file,
+    utm_bbox,
+    names_path="names.txt",
+    utm_epsg="EPSG:32632",
+    debug=False,
 ):
   excl_rules = load_exclusion_rules(names_path)
   transformer = Transformer.from_crs("EPSG:4326", utm_epsg, always_xy=True)
@@ -182,6 +275,7 @@ def load_osm_data(
       pt = Point(x, y)
       if utm_bbox.contains(pt):
         rec = dict(tags)
+        rec["_nid"] = nid
         rec["clean_name"] = clean_name(tags.get("name", ""), excl_rules)
         rec["geometry"] = pt
         point_records.append(rec)
@@ -189,12 +283,15 @@ def load_osm_data(
   ways_coords = {}
   line_records = []
   polygon_records = []
+  rural_node_ids = set()
 
   for way in root.findall("way"):
     wid = way.attrib.get("id")
     coords = []
+    way_nids = []
     for nd in way.findall("nd"):
       ref = nd.attrib.get("ref")
+      way_nids.append(ref)
       xy = nodes_xy.get(ref)
       if xy is not None:
         coords.append(xy)
@@ -206,6 +303,9 @@ def load_osm_data(
     tags = _extract_tags(way)
     if not tags:
       continue
+
+    if tags.get("highway") in ("track", "path", "footway", "bridleway", "cycleway"):
+      rural_node_ids.update(way_nids)
 
     is_closed = coords[:1] == coords[-1:] and len(coords) >= 4
     has_area_tag = (
@@ -247,6 +347,11 @@ def load_osm_data(
         rec["geometry"] = geom
         line_records.append(rec)
 
+  point_records = [
+      rec for rec in point_records
+      if not (rec.get("barrier") == "gate" and rec.get("_nid") not in rural_node_ids)
+  ]
+
   rel_map = {r.attrib.get("id"): r for r in root.findall("relation")}
 
   for rel in root.findall("relation"):
@@ -254,7 +359,6 @@ def load_osm_data(
     if not tags:
       continue
 
-    # Linear relations (hiking trails, MTB routes, cycleways, roads)
     if tags.get("route") in ("hiking", "foot", "mtb", "bicycle", "road") or (
         tags.get("type") == "route" and "route" in tags
     ):
@@ -272,15 +376,28 @@ def load_osm_data(
           line_records.append(rec)
       continue
 
-    members = []
-    for m in rel.findall("member"):
-      if m.attrib.get("type") == "way":
-        members.append((m.attrib.get("role", "outer"), m.attrib.get("ref")))
+    if tags.get("type") in (
+        "restriction",
+        "route_master",
+        "superroute",
+        "connectivity",
+        "associatedStreet",
+        "public_transport",
+        "network",
+    ):
+      continue
+
+    rel_id = rel.attrib.get("id")
+    members = _extract_relation_ways(rel_id, rel_map)
     if not members:
       continue
 
-    # Area relations (multipolygons: forests, lakes, parks, riverbanks, etc.)
-    geom_rel = _build_relation_polygons(members, ways_coords)
+    geom_rel = _build_relation_polygons(members, ways_coords, utm_bbox=utm_bbox)
+    if debug and geom_rel is None and tags.get("type") == "multipolygon":
+      print(
+          f"[DEBUG] Multipolygon fallito: id={rel_id}, name={tags.get('name', '')}, tags={tags}, membri={len(members)}",
+          flush=True,
+      )
     if (
         geom_rel is not None
         and not geom_rel.is_empty

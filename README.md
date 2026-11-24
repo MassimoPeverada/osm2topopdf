@@ -190,3 +190,15 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 - **Custom OSM Tag Exclusions (`exclude_tags`):** Allow filtering out arbitrary `key=value` OpenStreetMap tags directly from the INI configuration.
 - **GeoTIFF DEM Support:** Add native support for `.tif` / `.tiff` Digital Elevation Models alongside ESRI ASCII Grid (`.asc`).
 - **Additional Language Packs:** Community translations (e.g., Portuguese, Dutch, Polish) via `lang_<code>.json` files.
+
+## Changelog
+
+### v1.1.8 (2026-11-24)
+- Added automatic topological closing of clipped multipolygons along the map bounding box (enabling full rendering of large rivers, forests, and parks even with `-fast` and `-superfast`).
+- Updated hydrographic layer `zorder` so riverbank polygons cleanly cover river centerlines (`waterway=river`).
+- Eliminated visible seam lines at joints between adjacent riverbank/water polygons while keeping crisp shoreline outlines.
+- Filtered out urban `barrier=gate` nodes to reduce map clutter, keeping gates only along rural tracks, paths, and cycleways while preserving `lift_gate` and `swing_gate` barriers everywhere.
+- Added hidden `-debug` diagnostic flag for multipolygon inspection.
+
+### v1.1.7 (2026-11-24)
+- Initial public release.

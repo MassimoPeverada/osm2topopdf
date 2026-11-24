@@ -7,7 +7,7 @@ Python and integrated with the help of Gemini.
 Released under GPLv3.
 """
 
-VERSION = "1.1.7"
+VERSION = "1.1.8"
 print(f"Starting osm2topopdf v{VERSION} cartographic engine...", flush=True)
 import argparse
 import configparser
@@ -201,6 +201,11 @@ def parse_args():
       action="store_true",
       help="Single-pass clipping with pyosmium C++ BackReferenceWriter.",
   )
+  parser.add_argument(
+      "-debug",
+      action="store_true",
+      help=argparse.SUPPRESS,
+  )  
   parser.add_argument(
       "-pad",
       type=float,
@@ -1020,8 +1025,9 @@ def main():
 
   print(f"Loading OSM data: {args.outosm}", flush=True)
   points, lines, polygons = load_osm_data(
-      args.outosm, bbox_poly, names_path=args.exclude, utm_epsg=utm_epsg
+      args.outosm, bbox_poly, names_path=args.exclude, utm_epsg=utm_epsg, debug=args.debug
   )
+
 
   print(
       f"  OSM features in bounding box: {len(points)} points, {len(lines)} lines, {len(polygons)} polygons",

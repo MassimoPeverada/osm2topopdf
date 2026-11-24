@@ -338,12 +338,12 @@ def draw_lines_and_contours(
 
   rivers = lines[_col(lines, "waterway").isin(["river", "canal"])]
   if not rivers.empty:
-    rivers.plot(ax=ax, color="#247ba0", linewidth=2.2, zorder=22.1)
-    rivers.plot(ax=ax, color="#72d6ff", linewidth=1.6, zorder=22.2)
+    rivers.plot(ax=ax, color="#247ba0", linewidth=2.2, zorder=18.1)
+    rivers.plot(ax=ax, color="#72d6ff", linewidth=1.6, zorder=18.2)
 
   streams = lines[_col(lines, "waterway") == "stream"]
   if not streams.empty:
-    streams.plot(ax=ax, color="#5cc2d1", linewidth=0.85, zorder=22.05)
+    streams.plot(ax=ax, color="#5cc2d1", linewidth=0.85, zorder=18.05)
 
   ditches = lines[_col(lines, "waterway").isin(["drain", "ditch"])]
   if not ditches.empty:
@@ -352,8 +352,9 @@ def draw_lines_and_contours(
         color="#5cc2d1",
         linewidth=0.45,
         linestyle=(0, (3, 1.5)),
-        zorder=22.0,
+        zorder=18.0,
     )
+
 
   runways = lines[_col(lines, "aeroway") == "runway"]
   if not runways.empty:

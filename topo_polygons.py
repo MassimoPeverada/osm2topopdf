@@ -180,9 +180,25 @@ def draw_topo_polygons(ax, polygons, xmin, ymin, xmax, ymax, scale):
         by="_area", ascending=False
     )
     if not subset.empty:
-      subset.plot(
-          ax=ax, facecolor=fcol, edgecolor=ecol, linewidth=lw, zorder=zord
-      )
+      if name == "water":
+        subset.plot(
+            ax=ax,
+            facecolor="none",
+            edgecolor=ecol,
+            linewidth=lw * 1.6,
+            zorder=zord,
+        )
+        subset.plot(
+            ax=ax,
+            facecolor=fcol,
+            edgecolor="none",
+            zorder=zord + 0.01,
+        )
+      else:
+        subset.plot(
+            ax=ax, facecolor=fcol, edgecolor=ecol, linewidth=lw, zorder=zord
+        )
+
 
   if "boundary" in polygons.columns:
     parks = polygons[polygons["boundary"] == "protected_area"]
