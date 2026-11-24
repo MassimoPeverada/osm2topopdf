@@ -3,6 +3,7 @@ import geopandas as gpd
 import matplotlib.patheffects as path_effects
 import pandas as pd
 from shapely.geometry import LineString, MultiLineString
+from shapely.ops import linemerge
 
 
 def _col(df, name):
@@ -362,15 +363,30 @@ def draw_lines_and_contours(
 
   route_h = lines[_col(lines, "route") == "hiking"]
   if not route_h.empty:
-    gpd.GeoSeries([route_h.geometry.unary_union], crs=route_h.crs).plot(
-        ax=ax, color="#e60000", linewidth=2.2, alpha=0.38, zorder=51
+    merged_h = linemerge(route_h.geometry.unary_union)
+    gpd.GeoSeries([merged_h], crs=route_h.crs).plot(
+        ax=ax,
+        color="#e60000",
+        linewidth=2.2,
+        alpha=0.38,
+        capstyle="butt",
+        joinstyle="round",
+        zorder=51,
     )
 
   route_b = lines[_col(lines, "route").isin(["bicycle", "mtb"])]
   if not route_b.empty:
-    gpd.GeoSeries([route_b.geometry.unary_union], crs=route_b.crs).plot(
-        ax=ax, color="#8e007a", linewidth=2.2, alpha=0.38, zorder=51.1
+    merged_b = linemerge(route_b.geometry.unary_union)
+    gpd.GeoSeries([merged_b], crs=route_b.crs).plot(
+        ax=ax,
+        color="#8e007a",
+        linewidth=2.2,
+        alpha=0.38,
+        capstyle="butt",
+        joinstyle="round",
+        zorder=51.1,
     )
+
 
   is_tunnel = _col(lines, "tunnel").isin(["yes", "building_passage"])
   _draw_topo_tracks(ax, lines, is_tunnel, scale=scale)

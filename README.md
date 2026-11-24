@@ -198,6 +198,7 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 - Updated hydrographic layer `zorder` so riverbank polygons cleanly cover river centerlines (`waterway=river`).
 - Eliminated visible seam lines at joints between adjacent riverbank/water polygons while keeping crisp shoreline outlines.
 - Filtered out urban `barrier=gate` nodes to reduce map clutter, keeping gates only along rural tracks, paths, and cycleways while preserving `lift_gate` and `swing_gate` barriers everywhere.
+- Smoothed hiking and cycling route highlights using linemerge and butt capstyles to prevent opacity overlaps at segment joints.
 - Added hidden `-debug` diagnostic flag for multipolygon inspection.
 
 ### v1.1.7 (2026-11-24)
