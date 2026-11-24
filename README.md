@@ -6,7 +6,7 @@
 
 **Topographic Georeferenced PDF Map Generator from OpenStreetMap Data and GPX Tracks**
 
-Utility by **Massimo Peverada** to make a georeferenced PDF from OSM data, given one or more GPX tracks, based on a FreeBASIC utility to convert OSM to DXF, ported to Python and integrated with the help of Gemini.
+Utility by **Massimo Peverada** to make a georeferenced PDF from OSM data, given one or more GPX tracks, based on a FreeBASIC utility to convert OSM to DXF, ported to Python and developed with the help of Gemini.
 
 Released under the **GNU General Public License v3.0 (GPLv3)**.
 
