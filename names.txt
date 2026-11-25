@@ -6,26 +6,44 @@
 ' --- Shops & retail (all shops) ---
 @exclude: shop=*
 
-' --- Food, drinks & financial services ---
-@exclude: amenity=bar, cafe, restaurant, fast_food, pub, biergarten, ice_cream, food_court, bank, bureau_de_change
-@exclude: building=retail
-' --- Companies, factories, warehouses & offices under 1000 m2 ---
-@exclude: building=industrial, warehouse, manufacture, commercial, retail, office; area<1000
-@exclude: landuse=industrial, commercial, retail; area<1000
-@exclude: office=*; area<1000
+' --- Food, drinks, public services & amenities ---
+@exclude: amenity=arts_centre, bank, bar, biergarten, bureau_de_change, cafe, college, community_centre, drinking_water, fast_food, food_court, fuel, ice_cream, kindergarten, library, nightclub, police, post_office, pub, restaurant, school, social_facility
+@exclude: building=apartments, college, hotel, kindergarten, public, retail, school
+@exclude: school=*
+
+' --- Companies, factories, warehouses & offices ---
+@exclude: building=industrial; area<20000
+@exclude: building=commercial, manufacture, office, retail, warehouse; area<2000
+@exclude: landuse=commercial, industrial, retail; area<5000
+@exclude: office=*
 @exclude: craft=*; area<1000
 @exclude: company=*; area<1000
+
+' --- Tourism, sports, leisure & clubs ---
+@exclude: club=*
+@exclude: leisure=dance, fitness_centre
+@exclude: sport=boules, bowls
+@exclude: tourism=apartment, bed_and_breakfast, guest_house, hostel, hotel, motel
 
 ' --- Generic buildings under 300 m2 (keeps churches, huts, castles, etc.) ---
 @exclude: building=yes; area<300
 
 ' ==============================================================================
-' TEXT-BASED EXCLUSIONS (b=begins with, e=equals, i=contains)
+' TEXT-BASED EXCLUSIONS (begins:, equals:, contains:)
 ' ==============================================================================
-itoret
-is.r.l.
-isrl
-is.n.c.
-isnc
-is.a.s.
-is.p.a
+begins: aula
+begins: aule
+begins: centro d'incontro
+begins: centro di incontro
+begins: dipartimento
+begins: fabbricato
+begins: segreteria
+contains: b&b
+contains: bocciofila
+contains: cooperativa
+contains: palestra
+contains: s.n.c.
+contains: s.r.l.
+contains: snc
+contains: srl
+equals: portico
