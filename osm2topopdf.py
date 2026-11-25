@@ -7,7 +7,7 @@ Python and integrated with the help of Gemini.
 Released under GPLv3.
 """
 
-VERSION = "1.1.8"
+VERSION = "1.1.9"
 print(f"Starting osm2topopdf v{VERSION} cartographic engine...", flush=True)
 import argparse
 import configparser
@@ -237,8 +237,13 @@ def parse_args():
   parser.add_argument(
       "-exclude",
       default=def_exclude,
-      help="File with name exclusion rules (prefixes b=begins with, e=equals, i=contains).",
+      help=(
+          "File with name exclusion rules: 'begins: text', 'equals: text', "
+          "'contains: text' and OSM tag/area rules "
+          "('@exclude: key=val1,val2 [; area<1000]')."
+      ),
   )
+
   parser.add_argument(
       "-labels",
       default=def_labels,
@@ -253,7 +258,7 @@ def parse_args():
       "-scale",
       type=int,
       default=def_scale,
-      help="Map cartographic scale (e.g. 25000 or 15000).",
+      help="Map cartographic scale, between 5000 and 75000 (e.g. 25000 or 50000).",
   )
   parser.add_argument(
       "-symscale",
@@ -292,6 +297,8 @@ def parse_args():
     sys.exit(0)
 
   args = parser.parse_args()
+  if not (5000 <= args.scale <= 75000):
+    parser.error("argument -scale: must be between 5000 and 75000")
   if args.positional_gpx:
     args.track = args.positional_gpx
   args.credits_text = def_credits
@@ -836,10 +843,12 @@ def main():
   if not args.outpdf.lower().endswith(".pdf"):
     args.outpdf += ".pdf"
 
+  # Verify early that the output PDF is not locked/open in another application (especially on Windows)
   if os.path.exists(args.outpdf):
+    tmp_check = args.outpdf + ".lockcheck"
     try:
-      with open(args.outpdf, "a+b"):
-        pass
+      os.replace(args.outpdf, tmp_check)
+      os.replace(tmp_check, args.outpdf)
     except PermissionError:
       print(
           f"[ERROR] Output PDF file '{args.outpdf}' is currently locked or open in another program. "
@@ -1058,7 +1067,15 @@ def main():
 
   print("Rendering TOPO cartographic layers...", flush=True)
   draw_topo_polygons(ax_m, polygons, xmin, ymin, xmax, ymax, args.scale)
-  draw_lines_and_contours(ax_m, lines, gdf_contours, bbox_poly, scale=args.scale, major_step_m=args.dtmmain)
+  draw_lines_and_contours(
+    ax_m,
+    lines,
+    gdf_contours,
+    bbox_poly,
+    scale=args.scale,
+    major_step_m=args.dtmmain,
+    symscale=args.symscale_val,
+  )
 
 
   gdf_gpx.plot(

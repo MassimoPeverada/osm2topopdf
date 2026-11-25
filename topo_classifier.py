@@ -48,7 +48,7 @@ def classify_feature(row, is_node=False):
 
     if _val(row, "railway") == "station":
       if _val(row, "station") == "subway":
-        return "station_subway", name, ""
+        return None, "", ""
       return "railway_station", name, ""
 
     hist = _val(row, "historic")

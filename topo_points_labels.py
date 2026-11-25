@@ -1,4 +1,5 @@
 import math
+
 from topo_classifier import classify_feature
 from topo_labels_config import (
     KHARTUM_RULES,
@@ -8,6 +9,7 @@ from topo_labels_config import (
 import matplotlib.patheffects as PathEffects
 from shapely.geometry import box
 
+LABEL_DEDUP_RADIUS_M = 400.0  # Minimum radius (in meters) between identical labels
 
 def draw_points_and_labels(
     ax,
@@ -104,13 +106,14 @@ def draw_points_and_labels(
           "has_icon": has_icon,
       })
 
-  # Deduplication within 200m
+  # Deduplication within LABEL_DEDUP_RADIUS_M
   candidates.sort(key=lambda c: c["prio"], reverse=True)
   dedup = []
   for item in candidates:
     if item["t1"] and any(
         e["t1"] == item["t1"]
-        and math.hypot(item["x"] - e["x"], item["y"] - e["y"]) <= 200.0
+        and math.hypot(item["x"] - e["x"], item["y"] - e["y"])
+        <= LABEL_DEDUP_RADIUS_M
         for e in dedup
     ):
       item["t1"], item["t2"] = "", ""

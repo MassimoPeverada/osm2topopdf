@@ -36,11 +36,21 @@ CRT_ROAD_STYLES = [
         36,
     ),
     (
+        "service_roads",
+        lambda df: _col(df, "highway") == "service",
+        "#000000",
+        1.0,
+        "#ffffff",
+        0.65,
+        "-",
+        1.0,
+        39.5,
+    ),
+    (
         "minor_roads",
         lambda df: _col(df, "highway").isin([
             "unclassified",
             "residential",
-            "service",
             "living_street",
             "pedestrian",
         ]),
@@ -135,9 +145,9 @@ def _generate_parallels(gdf, distance_m):
   return gs_left, gs_right
 
 
-def _draw_topo_tracks(ax, lines, is_tunnel, scale=25000):
+def _draw_topo_tracks(ax, lines, is_tunnel, scale=25000, symscale=1.0):
   # Half-offset of 0.20 mm on paper -> total track width 0.40 mm (as in TOPO)
-  offset_m = (0.20 * float(scale)) / 1000.0
+  offset_m = (0.20 * symscale * float(scale)) / 1000.0
   is_track = _col(lines, "highway") == "track"
   is_rough = is_track & _col(lines, "tracktype").isin(["grade4", "grade5"])
   is_norm = is_track & (~_col(lines, "tracktype").isin(["grade4", "grade5"]))
@@ -145,13 +155,15 @@ def _draw_topo_tracks(ax, lines, is_tunnel, scale=25000):
   rough_surf = lines[is_rough & (~is_tunnel)]
   rough_tunn = lines[is_rough & is_tunnel]
   if not rough_surf.empty:
-    rough_surf.plot(ax=ax, color="#ffffff", linewidth=0.65, zorder=37.0)
+    rough_surf.plot(
+        ax=ax, color="#ffffff", linewidth=0.65 * symscale, zorder=37.0
+    )
     gs_left, gs_right = _generate_parallels(rough_surf, offset_m)
     if not gs_left.empty:
       gs_left.plot(
           ax=ax,
           color="#000000",
-          linewidth=0.40,
+          linewidth=0.40 * symscale,
           linestyle=(0, (2.6, 1.8)),
           zorder=37.1,
       )
@@ -159,7 +171,7 @@ def _draw_topo_tracks(ax, lines, is_tunnel, scale=25000):
       gs_right.plot(
           ax=ax,
           color="#000000",
-          linewidth=0.40,
+          linewidth=0.40 * symscale,
           linestyle=(0, (2.6, 1.8)),
           zorder=37.1,
       )
@@ -167,7 +179,7 @@ def _draw_topo_tracks(ax, lines, is_tunnel, scale=25000):
     rough_tunn.plot(
         ax=ax,
         color="#666666",
-        linewidth=0.85,
+        linewidth=0.85 * symscale,
         linestyle="--",
         alpha=0.75,
         zorder=37.0,
@@ -176,13 +188,15 @@ def _draw_topo_tracks(ax, lines, is_tunnel, scale=25000):
   norm_surf = lines[is_norm & (~is_tunnel)]
   norm_tunn = lines[is_norm & is_tunnel]
   if not norm_surf.empty:
-    norm_surf.plot(ax=ax, color="#ffffff", linewidth=0.65, zorder=38.0)
+    norm_surf.plot(
+        ax=ax, color="#ffffff", linewidth=0.65 * symscale, zorder=38.0
+    )
     gs_left, gs_right = _generate_parallels(norm_surf, offset_m)
     if not gs_left.empty:
       gs_left.plot(
           ax=ax,
           color="#000000",
-          linewidth=0.40,
+          linewidth=0.40 * symscale,
           linestyle="-",
           zorder=38.1,
       )
@@ -190,7 +204,7 @@ def _draw_topo_tracks(ax, lines, is_tunnel, scale=25000):
       gs_right.plot(
           ax=ax,
           color="#000000",
-          linewidth=0.40,
+          linewidth=0.40 * symscale,
           linestyle=(0, (2.8, 1.8)),
           zorder=38.1,
       )
@@ -198,7 +212,7 @@ def _draw_topo_tracks(ax, lines, is_tunnel, scale=25000):
     norm_tunn.plot(
         ax=ax,
         color="#666666",
-        linewidth=0.95,
+        linewidth=0.95 * symscale,
         linestyle="--",
         alpha=0.75,
         zorder=38.0,
@@ -309,7 +323,13 @@ def _label_major_contours(ax, c_pri, utm_bbox):
 
 
 def draw_lines_and_contours(
-    ax, lines, gdf_contours, utm_bbox, scale=25000, major_step_m=100.0
+    ax,
+    lines,
+    gdf_contours,
+    utm_bbox,
+    scale=25000,
+    major_step_m=100.0,
+    symscale=1.0,
 ):
   if gdf_contours is not None and not gdf_contours.empty:
     c_clip = gpd.clip(gdf_contours, utm_bbox)
@@ -333,33 +353,31 @@ def draw_lines_and_contours(
         )
         _label_major_contours(ax, c_pri, utm_bbox)
 
-
   if lines.empty:
     return
 
   rivers = lines[_col(lines, "waterway").isin(["river", "canal"])]
   if not rivers.empty:
-    rivers.plot(ax=ax, color="#247ba0", linewidth=2.2, zorder=18.1)
-    rivers.plot(ax=ax, color="#72d6ff", linewidth=1.6, zorder=18.2)
+    rivers.plot(ax=ax, color="#247ba0", linewidth=2.2 * symscale, zorder=18.1)
+    rivers.plot(ax=ax, color="#72d6ff", linewidth=1.6 * symscale, zorder=18.2)
 
   streams = lines[_col(lines, "waterway") == "stream"]
   if not streams.empty:
-    streams.plot(ax=ax, color="#5cc2d1", linewidth=0.85, zorder=18.05)
+    streams.plot(ax=ax, color="#5cc2d1", linewidth=0.85 * symscale, zorder=18.05)
 
   ditches = lines[_col(lines, "waterway").isin(["drain", "ditch"])]
   if not ditches.empty:
     ditches.plot(
         ax=ax,
         color="#5cc2d1",
-        linewidth=0.45,
+        linewidth=0.45 * symscale,
         linestyle=(0, (3, 1.5)),
         zorder=18.0,
     )
 
-
   runways = lines[_col(lines, "aeroway") == "runway"]
   if not runways.empty:
-    runways.plot(ax=ax, color="#555555", linewidth=3.5, zorder=39)
+    runways.plot(ax=ax, color="#555555", linewidth=3.5 * symscale, zorder=39)
 
   route_h = lines[_col(lines, "route") == "hiking"]
   if not route_h.empty:
@@ -367,7 +385,7 @@ def draw_lines_and_contours(
     gpd.GeoSeries([merged_h], crs=route_h.crs).plot(
         ax=ax,
         color="#e60000",
-        linewidth=2.2,
+        linewidth=2.2 * symscale,
         alpha=0.38,
         capstyle="butt",
         joinstyle="round",
@@ -380,16 +398,15 @@ def draw_lines_and_contours(
     gpd.GeoSeries([merged_b], crs=route_b.crs).plot(
         ax=ax,
         color="#8e007a",
-        linewidth=2.2,
+        linewidth=2.2 * symscale,
         alpha=0.38,
         capstyle="butt",
         joinstyle="round",
         zorder=51.1,
     )
 
-
   is_tunnel = _col(lines, "tunnel").isin(["yes", "building_passage"])
-  _draw_topo_tracks(ax, lines, is_tunnel, scale=scale)
+  _draw_topo_tracks(ax, lines, is_tunnel, scale=scale, symscale=symscale)
 
   for (
       _,
@@ -412,7 +429,7 @@ def draw_lines_and_contours(
         norm_u.plot(
             ax=ax,
             color=col_b,
-            linewidth=lw_b,
+            linewidth=lw_b * symscale,
             capstyle="round",
             joinstyle="round",
             zorder=zord,
@@ -420,7 +437,7 @@ def draw_lines_and_contours(
         norm_u.plot(
             ax=ax,
             color=col_f,
-            linewidth=lw_f,
+            linewidth=lw_f * symscale,
             linestyle=ls,
             alpha=alpha,
             capstyle="round",
@@ -431,7 +448,7 @@ def draw_lines_and_contours(
         norm.plot(
             ax=ax,
             color=col_f,
-            linewidth=lw_f,
+            linewidth=lw_f * symscale,
             linestyle=ls,
             alpha=alpha,
             zorder=zord + 0.1,
@@ -440,7 +457,7 @@ def draw_lines_and_contours(
       tunn.plot(
           ax=ax,
           color="#666666",
-          linewidth=max(lw_f, 1.0),
+          linewidth=max(lw_f, 1.0) * symscale,
           linestyle="--",
           alpha=0.75,
           zorder=zord,
@@ -458,14 +475,14 @@ def draw_lines_and_contours(
       rail_norm.plot(
           ax=ax,
           color="#000000",
-          linewidth=1.45,
+          linewidth=1.45 * symscale,
           capstyle="butt",
           zorder=52,
       )
       rail_norm.plot(
           ax=ax,
           color="#ffffff",
-          linewidth=0.90,
+          linewidth=0.90 * symscale,
           linestyle=(0, (3.2, 3.2)),
           capstyle="butt",
           zorder=52.1,
@@ -475,7 +492,7 @@ def draw_lines_and_contours(
       rail_tunn.plot(
           ax=ax,
           color="#666666",
-          linewidth=1.35,
+          linewidth=1.35 * symscale,
           linestyle="--",
           alpha=0.75,
           zorder=52,
@@ -483,7 +500,7 @@ def draw_lines_and_contours(
       rail_tunn.plot(
           ax=ax,
           color="#ffffff",
-          linewidth=0.80,
+          linewidth=0.80 * symscale,
           linestyle=(0, (3.2, 3.2)),
           alpha=0.85,
           zorder=52.1,
@@ -494,11 +511,11 @@ def draw_lines_and_contours(
       | (_col(lines, "railway") == "funicular")
   ]
   if not aerialways.empty:
-    aerialways.plot(ax=ax, color="#000000", linewidth=0.65, zorder=53)
+    aerialways.plot(ax=ax, color="#000000", linewidth=0.65 * symscale, zorder=53)
     aerialways.plot(
         ax=ax,
         color="#000000",
-        linewidth=2.3,
+        linewidth=2.3 * symscale,
         linestyle=(0, (0.7, 5.5)),
         zorder=53.1,
     )
@@ -509,15 +526,19 @@ def draw_lines_and_contours(
   ]
   if not dams_l.empty:
     dams_l.plot(
-        ax=ax, color="#000000", linewidth=1.1, capstyle="butt", zorder=34
+        ax=ax,
+        color="#000000",
+        linewidth=1.1 * symscale,
+        capstyle="butt",
+        zorder=34,
     )
-    offset_dam_m = (0.35 * float(scale)) / 1000.0
+    offset_dam_m = (0.35 * symscale * float(scale)) / 1000.0
     _, gs_downstream = _generate_parallels(dams_l, offset_dam_m)
     if not gs_downstream.empty:
       gs_downstream.plot(
           ax=ax,
           color="#000000",
-          linewidth=1.5,
+          linewidth=1.5 * symscale,
           linestyle=(0, (1.2, 2.4)),
           capstyle="butt",
           zorder=34.1,

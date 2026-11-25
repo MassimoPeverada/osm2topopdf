@@ -1,0 +1,31 @@
+' ==============================================================================
+' UNIVERSAL OSM LABEL EXCLUSIONS (hides only the text label, keeps icons/shapes)
+' Syntax: @exclude: key=val1,val2 [; area<1000]
+' ==============================================================================
+
+' --- Shops & retail (all shops) ---
+@exclude: shop=*
+
+' --- Food, drinks & financial services ---
+@exclude: amenity=bar, cafe, restaurant, fast_food, pub, biergarten, ice_cream, food_court, bank, bureau_de_change
+@exclude: building=retail
+' --- Companies, factories, warehouses & offices under 1000 m2 ---
+@exclude: building=industrial, warehouse, manufacture, commercial, retail, office; area<1000
+@exclude: landuse=industrial, commercial, retail; area<1000
+@exclude: office=*; area<1000
+@exclude: craft=*; area<1000
+@exclude: company=*; area<1000
+
+' --- Generic buildings under 300 m2 (keeps churches, huts, castles, etc.) ---
+@exclude: building=yes; area<300
+
+' ==============================================================================
+' TEXT-BASED EXCLUSIONS (b=begins with, e=equals, i=contains)
+' ==============================================================================
+itoret
+is.r.l.
+isrl
+is.n.c.
+isnc
+is.a.s.
+is.p.a
