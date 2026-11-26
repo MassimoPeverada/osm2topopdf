@@ -7,7 +7,7 @@ Python and integrated with the help of Gemini.
 Released under GPLv3.
 """
 
-VERSION = "1.1.9"
+VERSION = "1.1.10"
 print(f"Starting osm2topopdf v{VERSION} cartographic engine...", flush=True)
 import argparse
 import configparser
@@ -53,10 +53,15 @@ lang = en
 author = 
 
 [CREDITS]
+# Optional language-specific credits can be added using text_<lang> (e.g., text_it = ...)
+# and will be used automatically when running with -lang <lang> (e.g., -lang it).
 text = Generated with osm2topopdf v{VERSION}
+	https://github.com
 	Map data: © OpenStreetMap contributors (ODbL License)
+	https://openstreetmap.org
 	Contour lines (eq. {dtmsec} m) based on Digital Terrain Model...
 	Projection: WGS 84 / {UTM}
+
 """
 
 
@@ -299,6 +304,7 @@ def parse_args():
     parser.error("argument -scale: must be between 5000 and 75000")
   if args.positional_gpx:
     args.track = args.positional_gpx
+  args.cfg = cfg
   args.credits_text = def_credits
   args.symscale_val = compute_symscale(args.symscale, args.scale)
   return args
@@ -1150,10 +1156,15 @@ def main():
   base_name = next(iter(os.path.splitext(os.path.basename(args.track))))
   title = args.title or base_name.replace("_", " ").upper()
 
-  if active_lang == "it" and (
-      not args.credits_text.strip()
-      or "Generated with osm2topopdf" in args.credits_text
-  ):
+  lang_credits = ""
+  if hasattr(args, "cfg") and args.cfg.has_section("CREDITS"):
+    lang_credits = args.cfg.get(
+        "CREDITS", f"text_{active_lang}", fallback=""
+    ).strip()
+
+  raw_credits = lang_credits or args.credits_text.strip()
+
+  if not raw_credits:
     final_credits = strings["default_credits"].format(
         version=VERSION,
         dtmsec=int(round(args.dtmsec)),
@@ -1161,13 +1172,14 @@ def main():
     )
   else:
     final_credits = (
-        args.credits_text.replace("{VERSION}", VERSION)
+        raw_credits.replace("{VERSION}", VERSION)
         .replace("{UTM}", utm_label)
         .replace("UTM Zone 32N", utm_label)
         .replace("UTM 32N", utm_label)
         .replace("{dtmsec}", str(int(round(args.dtmsec))))
         .replace("eq. 25 m", f"eq. {int(round(args.dtmsec))} m")
     )
+
 
   draw_legend(
       ax_l,

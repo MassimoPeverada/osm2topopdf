@@ -10,6 +10,17 @@ Utility by **Massimo Peverada** to make a georeferenced PDF from OSM data, given
 
 Released under the **GNU General Public License v3.0 (GPLv3)**.
 
+
+## Sample Map Output
+
+<p align="center">
+  <a href="assets/demo_corners.png">
+    <img src="assets/demo_corners.png" alt="osm2topopdf sample map corners" width="680">
+  </a>
+  <br>
+  <em>Click the image to view full resolution (four corners showing UTM axis ticks, GPX track styling, legend, and clickable data credits).</em>
+</p>
+
 ---
 
 ## Features
@@ -163,6 +174,8 @@ You can customize label text, coordinates, offsets, and rendering priority in `l
 ## Configuration File (`osm2topopdf.ini`)
 
 On first run, `osm2topopdf` generates `osm2topopdf.ini` in the working directory. You can store your recurring paths (such as your regional `.osm.pbf` extract, local DTM folder, default language, author name, and map credits) there so you don't have to type them every time. Command-line flags always override INI values.
+* **Multilingual Credits (`text_<lang>`):** Define language-specific credit blocks (e.g., `text_it`, `text_fr`) in `[CREDITS]`, selected via `-lang <code>` or INI settings with a fallback to `text`.
+* **Clickable Hyperlinks:** URLs or Markdown links (`[Label](https://...)`) in `[CREDITS]` render as clickable hyperlinks in the PDF.
 
 ---
 
@@ -225,6 +238,14 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 - **Additional Language Packs:** Community translations (e.g., Portuguese, Dutch, Polish) via `lang_<code>.json` files.
 
 ## Changelog
+
+### v1.1.10 (2026-11-26)
+
+- Added clickable PDF hyperlinks and Markdown link support in legend credits (`legend.py`).
+- Added multilingual credit block support (`text_<lang>`) in `osm2topopdf.ini` with `-lang` selection.
+- Improved vertical spacing of legend header and credits across tall map formats (`legend.py`).
+- Disabled internal coordinate grid lines by default for cleaner map readability (border UTM ticks preserved).
+- Added sample four-corner map preview (`assets/demo_corners.png`) to `README.md`.
 
 ### v1.1.9 (2026-11-25)
 - Added universal OSM tag and polygon area label filtering (`@exclude: key=val1,val2` with optional area filter) in `names.txt` (`-exclude`), hiding unwanted shop, restaurant, and small company labels while preserving building footprints and map symbols, plus an updated `names.txt` sample file in the repository root.

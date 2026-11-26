@@ -4,7 +4,7 @@ from matplotlib.patches import Circle, Patch, Rectangle
 import matplotlib.patheffects as PathEffects
 from matplotlib.text import Text
 from topo_symbols import TOPO_MARKERS
-
+import re
 
 class _BoxSymbol:
 
@@ -426,6 +426,38 @@ def _legend_road(col_fill, lw_fill, lw_border, label, ls="-", alpha=1.0):
       [PathEffects.withStroke(linewidth=lw_border, foreground="#000000")]
   )
   return line
+
+
+REPO_URL = "https://github.com/MassimoPeverada/osm2topopdf"
+OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
+
+def _parse_credit_line(line):
+  """Return (visible_text, url_or_none) for a single credit line."""
+  s = line.strip()
+  if not s:
+    return "", None
+
+  # 1. Markdown link syntax [Text](https://...)
+  m_md = re.search(r"\[([^\]]+)\]\((https?://[^\s)]+)\)", s)
+  if m_md:
+    clean_text = s[:m_md.start()] + m_md.group(1) + s[m_md.end():]
+    return clean_text, m_md.group(2)
+
+  # 2. Explicit http:// or https:// URL in the line
+  m_url = re.search(r"(https?://[^\s)]+)", s)
+  if m_url:
+    return s, m_url.group(1)
+
+  # 3. Automatic fallback URLs for standard credit lines without explicit links
+  low = s.lower()
+  if "osm2topopdf" in low:
+    return s, REPO_URL
+  if "openstreetmap" in low:
+    return s, OSM_COPYRIGHT_URL
+
+  return s, None
+
+
 def draw_legend(
     ax_l,
     map_title,
@@ -788,16 +820,22 @@ def draw_legend(
     else:
       labels.append(v.get_label())
 
-  ax_l.text(0.0, 0.992, map_title, fontsize=9.0, fontweight="bold", va="top")
+  legend_h_pt = max(1.0, layout["h_mm"] * 72.0 / 25.4)
+  y_cursor = 0.994
+
+  ax_l.text(0.0, y_cursor, map_title, fontsize=9.0, fontweight="bold", va="top")
+  y_cursor -= (9.0 * 1.45) / legend_h_pt
+
   scale_str = f"{scale:,}"
   ax_l.text(
       0.0,
-      0.964,
+      y_cursor,
       f"{strings['scale_prefix']}{scale_str}",
       fontsize=7.2,
       fontweight="bold",
       va="top",
   )
+  y_cursor -= (7.2 * 1.45) / legend_h_pt
 
   meta_info = []
   if author:
@@ -805,17 +843,21 @@ def draw_legend(
   if date_str:
     meta_info.append(f"{strings['date_prefix']} {date_str}")
 
-  y_legend = 0.930
   if meta_info:
     ax_l.text(
         0.0,
-        0.938,
+        y_cursor,
         "  |  ".join(meta_info),
         fontsize=5.2,
         color="#222222",
         va="top",
     )
-    y_legend = 0.916
+    y_cursor -= (5.2 * 1.65) / legend_h_pt
+  else:
+    y_cursor -= 4.0 / legend_h_pt
+
+  y_legend = y_cursor
+
   ax_l.legend(
       handles=items,
       labels=labels,
@@ -844,12 +886,24 @@ def draw_legend(
       version=version, dtmsec=dtmsec, utm=utm_label
   )
 
-  ax_l.text(
-      0.0,
-      0.005,
-      credits,
-      fontsize=5.2,
-      color="#111111",
-      va="bottom",
-      linespacing=1.28,
-  )
+  credit_lines = [ln for ln in credits.splitlines() if ln.strip()]
+  legend_h_pt = max(1.0, layout["h_mm"] * 72.0 / 25.4)
+  font_pt = 5.2
+  line_step = (font_pt * 1.32) / legend_h_pt
+  y_pos = 0.005
+
+  for line in reversed(credit_lines):
+    text_str, url_str = _parse_credit_line(line)
+    is_explicit_url = text_str.startswith(("http://", "https://"))
+    ax_l.text(
+        0.0,
+        y_pos,
+        text_str,
+        fontsize=font_pt,
+        fontweight="bold" if is_explicit_url else "normal",
+        color="#111111",
+        va="bottom",
+        url=url_str,
+    )
+    y_pos += line_step
+
