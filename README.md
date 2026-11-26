@@ -124,6 +124,42 @@ Running `python osm2topopdf.py` with no arguments prints the full help message a
 
 ---
 
+#### Custom Label Rules (`labels.txt`)
+
+You can customize label text, coordinates, offsets, and rendering priority in `labels.txt` (or any file passed via `-labels`). Lines starting with `'` are treated as comments, and multiple tags can be combined inside the same `ifname` block.
+
+- **Abbreviate or rename a label** (optionally restricted to a specific feature category via `ificon` such as `cycle_route`, `hiking_route`, `road`, `peak`, `hut`, `saddle`, `spring`, `viewpoint`, `castle`, or `church`):
+  ```xml
+  ' Shorten a long cycle route label
+  <tag k="ifname" v="Via della Pietra"/>
+  <tag k="ificon" v="cycle_route"/>
+  <tag k="replacename" v="VP"/>
+  ```
+
+- **Shift label coordinates by a relative offset** (in projected UTM meters):
+  ```xml
+  ' Shift a peak label 120 m East and 80 m North to avoid overlapping a ridge
+  <tag k="ifname" v="Monte Rocciamelone"/>
+  <tag k="offsetlon" v="120"/>
+  <tag k="offsetlat" v="80"/>
+  ```
+
+- **Pin a label to exact projected UTM coordinates:**
+  ```xml
+  <tag k="ifname" v="Colle del Lys"/>
+  <tag k="setlon" v="376450"/>
+  <tag k="setlat" v="5004200"/>
+  ```
+
+- **Override rendering priority** (higher values win collision checks; e.g., `200` forces a label to always be drawn above cities `180`, peaks `87`, and routes `8–10`):
+  ```xml
+  ' Ensure a key shelter or trail marker is never hidden by nearby labels
+  <tag k="ifname" v="Rifugio Rocciamelone"/>
+  <tag k="priority" v="200"/>
+  ```
+
+---
+
 ## Configuration File (`osm2topopdf.ini`)
 
 On first run, `osm2topopdf` generates `osm2topopdf.ini` in the working directory. You can store your recurring paths (such as your regional `.osm.pbf` extract, local DTM folder, default language, author name, and map credits) there so you don't have to type them every time. Command-line flags always override INI values.
@@ -196,6 +232,7 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 - Added automatic case-insensitive file matching for CLI path arguments (`-track`, `-trackvar`, `-inosm`, `-dtm`, `-contours`, `-exclude`, `-labels`, `-config`) across both Windows and Linux.
 - Enforced `-scale` range between `5000` and `75000` and extended `-symscale` proportional scaling to road, track, railway, and waterway widths (with slimmer `highway=service` styling to prevent parking-aisle clutter at 1:50,000).
 - Increased label deduplication radius to `400 m` for cleaner maps at overview scales and added an early file-lock check when the output PDF is already open.
+- Fix localized date formatting when -date is omitted.
 
 ### v1.1.8 (2026-11-24)
 - Added automatic topological closing of clipped multipolygons along the map bounding box (enabling full rendering of large rivers, forests, and parks even with `-fast` and `-superfast`).

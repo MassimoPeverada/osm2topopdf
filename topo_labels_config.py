@@ -100,6 +100,7 @@ EXCLUDED_SHOPS = {
     "convenience",
     "lightning",
 }
+
 EXCLUDED_AMENITIES = {
     "ice_cream",
     "dojo",
@@ -110,8 +111,29 @@ EXCLUDED_AMENITIES = {
     "bank",
 }
 
+ICON_ALIASES = {
+    "cycle_route": "TextBike3",
+    "bike_route": "TextBike3",
+    "bike": "TextBike3",
+    "hiking_route": "TextHiking3",
+    "trail_route": "TextHiking3",
+    "hiking": "TextHiking3",
+    "road": "TextRoad",
+    "road_ref": "TextRoad",
+    "peak": "natural_peak",
+    "hut": "alpine_hut",
+    "shelter": "alpine_hut",
+    "saddle": "natural_saddle",
+    "pass": "natural_saddle",
+    "spring": "spring",
+    "cave": "natural_cave_entrance",
+    "viewpoint": "tourism_viewpoint",
+    "castle": "historic_castle",
+    "church": "amenity_place_of_worship",
+}
 
-def load_label_overrides(overrides_path="scritte.txt"):
+
+def load_label_overrides(overrides_path="labels.txt"):
   overrides, custom_priorities = [], {}
   if not os.path.exists(overrides_path):
     return overrides, custom_priorities
@@ -129,6 +151,7 @@ def load_label_overrides(overrides_path="scritte.txt"):
       k, v = mk.group(1), mv.group(1)
 
       if k == "ifname":
+        curr_prio = None
         curr_mod = {
             "name": v,
             "icon": "",
@@ -139,12 +162,14 @@ def load_label_overrides(overrides_path="scritte.txt"):
             "replacename": "",
         }
         overrides.append(curr_mod)
+      elif curr_mod is not None and k in ("ificon", "icon"):
+        curr_mod["icon"] = ICON_ALIASES.get(v.strip().lower(), v.strip())
       elif curr_mod is not None and k in curr_mod:
-        curr_mod[k] = v if k in ("icon", "replacename") else float(v)
-      elif curr_mod is not None and k == "ificon":
-        curr_mod["icon"] = v
-
-      if k == "priorityname":
+        curr_mod[k] = v if k == "replacename" else float(v)
+      elif k == "priority" and curr_mod is not None and curr_prio is None:
+        custom_priorities[curr_mod["name"]] = int(v)
+      elif k == "priorityname":
+        curr_mod = None
         curr_prio = v
       elif k == "priority" and curr_prio:
         custom_priorities[curr_prio] = int(v)

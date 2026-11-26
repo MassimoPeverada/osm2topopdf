@@ -1,0 +1,20 @@
+' Custom label rules for osm2topopdf (-labels labels.txt)
+' Lines starting with ' are comments. Uncomment or add your own rules below.
+
+' 1. Abbreviate or rename a label and optionally boost its rendering priority
+'    (Optional category filter: cycle_route, hiking_route, road, peak, hut,
+'     saddle, spring, cave, viewpoint, castle, church — or internal codes)
+' <tag k="ifname" v="Via della Pietra"/>
+' <tag k="ificon" v="cycle_route"/>
+' <tag k="replacename" v="VP"/>
+' <tag k="priority" v="200"/>
+
+' 2. Shift a label by a relative offset in projected UTM meters (East / North)
+' <tag k="ifname" v="Monte Rocciamelone"/>
+' <tag k="offsetlon" v="120"/>
+' <tag k="offsetlat" v="80"/>
+
+' 3. Pin a label to exact projected UTM coordinates
+' <tag k="ifname" v="Colle del Lys"/>
+' <tag k="setlon" v="376450"/>
+' <tag k="setlat" v="5004200"/>

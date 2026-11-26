@@ -113,8 +113,6 @@ def parse_args():
   pre.add_argument("-config", default="osm2topopdf.ini")
   pre_args, _ = pre.parse_known_args()
   cfg = load_or_create_ini(pre_args.config)
-
-  today = datetime.now().strftime("%Y-%m-%d")
   def_inosm = cfg.get("PATHS", "inosm", fallback="")
   def_outosm = cfg.get("PATHS", "outosm", fallback="section.osm")
   def_dtm = cfg.get("PATHS", "dtm", fallback="")
@@ -287,8 +285,8 @@ def parse_args():
   )
   parser.add_argument(
       "-date",
-      default=today,
-      help="Date printed in the legend (pass \"\" to omit).",
+      default=None,
+      help='Date printed in the legend (default: auto by -lang, pass "" to omit).',
   )
 
   if len(sys.argv) == 1:
@@ -839,6 +837,15 @@ def main():
   t_start = time.perf_counter()
   args = parse_args()
   strings, active_lang = load_language(args.lang)
+  if args.date is None:
+    now = datetime.now()
+    if active_lang in ("it", "fr", "es"):
+      args.date = now.strftime("%d/%m/%Y")
+    elif active_lang == "de":
+      args.date = now.strftime("%d.%m.%Y")
+    else:
+      args.date = now.strftime("%Y-%m-%d")
+
 
   if not args.outpdf.lower().endswith(".pdf"):
     args.outpdf += ".pdf"
