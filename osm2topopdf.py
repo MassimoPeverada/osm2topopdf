@@ -49,6 +49,7 @@ dtmmain = 100
 dtmsec = 25
 symscale = auto
 utm = auto
+grid = off
 lang = en
 author = 
 
@@ -56,9 +57,9 @@ author =
 # Optional language-specific credits can be added using text_<lang> (e.g., text_it = ...)
 # and will be used automatically when running with -lang <lang> (e.g., -lang it).
 text = Generated with osm2topopdf v{VERSION}
-	https://github.com
+	https://github.com/MassimoPeverada/osm2topopdf
 	Map data: © OpenStreetMap contributors (ODbL License)
-	https://openstreetmap.org
+	https://www.openstreetmap.org/copyright
 	Contour lines (eq. {dtmsec} m) based on Digital Terrain Model...
 	Projection: WGS 84 / {UTM}
 
@@ -307,7 +308,10 @@ def parse_args():
   args.cfg = cfg
   args.credits_text = def_credits
   args.symscale_val = compute_symscale(args.symscale, args.scale)
+  def_grid_raw = cfg.get("MAP", "grid", fallback="off").strip().lower()
+  args.show_grid = def_grid_raw in ("1", "true", "yes", "on")
   return args
+
 def load_gpx_track(gpx_path, utm_pref="auto"):
   if not os.path.exists(gpx_path):
     raise FileNotFoundError(f"GPX file not found: {gpx_path}")
@@ -1039,9 +1043,10 @@ def main():
   yticks = list(range(int(ymin), int(ymax) + 1000, 1000))
   ax_m.set_xticks(xticks)
   ax_m.set_yticks(yticks)
-  ax_m.grid(
-      True, color="#4a90e2", linestyle="-", linewidth=0.35, alpha=0.55, zorder=90
-  )
+  if args.show_grid:
+    ax_m.grid(
+        True, color="#1d63b8", linestyle="-", linewidth=0.45, alpha=0.72, zorder=98
+    )
 
   bbox_poly = box(xmin, ymin, xmax, ymax)
 

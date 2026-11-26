@@ -32,6 +32,7 @@ Released under the **GNU General Public License v3.0 (GPLv3)**.
 - **Smart Label & Symbol Placement:** Priority-based classification engine with 400 m deduplication, border clipping, and bounding-box collision avoidance.
 - **Multilingual Legend & Axes:** Defaults to English (`-lang en`), with built-in support for Italian (`-lang it`), French (`-lang fr`), German (`-lang de`), and Spanish (`-lang es`), plus easy extensibility to other languages.
 - **Automatic UTM Zone Detection:** Automatically selects the appropriate WGS 84 UTM zone from the GPX track centroid (or accepts a manual zone such as `32N` or `19S`).
+- **Configurable UTM Coordinate Grid:** Displays 1,000 m UTM axis ticks along the map frame, with optional internal coordinate grid lines toggleable via `grid = on/off` in `osm2topopdf.ini`.
 
 ---
 
@@ -244,7 +245,7 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 - Added clickable PDF hyperlinks and Markdown link support in legend credits (`legend.py`).
 - Added multilingual credit block support (`text_<lang>`) in `osm2topopdf.ini` with `-lang` selection.
 - Improved vertical spacing of legend header and credits across tall map formats (`legend.py`).
-- Disabled internal coordinate grid lines by default for cleaner map readability (border UTM ticks preserved).
+- Added configurable internal UTM grid lines (`grid = off` / `on` in `osm2topopdf.ini`, disabled by default for cleaner map readability; border UTM ticks preserved).
 - Added sample four-corner map preview (`assets/demo_corners.png`) to `README.md`.
 
 ### v1.1.9 (2026-11-25)
