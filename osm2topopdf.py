@@ -7,7 +7,7 @@ Python and integrated with the help of Gemini.
 Released under GPLv3.
 """
 
-VERSION = "1.1.10"
+VERSION = "1.1.11"
 print(f"Starting osm2topopdf v{VERSION} cartographic engine...", flush=True)
 import argparse
 import configparser
@@ -40,6 +40,7 @@ outosm = section.osm
 dtm = 
 contours = contour_lines.osm
 exclude = names.txt
+filters = osmfilters.txt
 labels = labels.txt
 
 [MAP]
@@ -124,6 +125,7 @@ def parse_args():
   def_dtm = cfg.get("PATHS", "dtm", fallback="")
   def_contours = cfg.get("PATHS", "contours", fallback="contour_lines.osm")
   def_exclude = cfg.get("PATHS", "exclude", fallback="names.txt")
+  def_filters = cfg.get("PATHS", "filters", fallback="osmfilters.txt")
   def_labels = cfg.get("PATHS", "labels", fallback="labels.txt")
   def_scale = cfg.getint("MAP", "scale", fallback=25000)
   def_pad = cfg.getfloat("MAP", "pad", fallback=500.0)
@@ -245,6 +247,15 @@ def parse_args():
           "File with name exclusion rules: 'begins: text', 'equals: text', "
           "'contains: text' and OSM tag/area rules "
           "('@exclude: key=val1,val2 [; area<1000]')."
+      ),
+  )
+
+  parser.add_argument(
+      "-filters",
+      default=def_filters,
+      help=(
+          "File with OSM feature filter rules to hide nodes, ways, or polygons "
+          "(e.g. 'amenity=hospital; emergency=first_aid; area < 1000; scale > 25000')."
       ),
   )
 
@@ -943,6 +954,36 @@ def main():
       flush=True,
   )
 
+  map_w_mm = ((xmax - xmin) * 1000.0) / args.scale
+  map_h_mm = ((ymax - ymin) * 1000.0) / args.scale
+
+  layout = compute_legend_layout(map_h_mm)
+  margin_mm = 12.0
+  gap_mm = 5.0
+  legend_w_mm = layout["w_mm"]
+  legend_h_mm = layout["h_mm"]
+
+  body_h_mm = max(map_h_mm, legend_h_mm)
+  tot_w_mm = margin_mm + map_w_mm + gap_mm + legend_w_mm + margin_mm
+  tot_h_mm = margin_mm + body_h_mm + margin_mm
+
+  # ISO 32000 maximum PDF page dimension is 200 x 200 inches (~5080 x 5080 mm)
+  MAX_PDF_MM = 5080.0
+  if tot_w_mm > MAX_PDF_MM or tot_h_mm > MAX_PDF_MM:
+    avail_w = max(50.0, MAX_PDF_MM - (2.0 * margin_mm + gap_mm + legend_w_mm))
+    avail_h = max(50.0, MAX_PDF_MM - (2.0 * margin_mm))
+    min_scale = math.ceil(
+        max(((xmax - xmin) * 1000.0) / avail_w, ((ymax - ymin) * 1000.0) / avail_h)
+    )
+    print(
+        f"[ERROR] Resulting PDF page size ({tot_w_mm:.0f} x {tot_h_mm:.0f} mm) exceeds "
+        f"the maximum allowed PDF limit ({int(MAX_PDF_MM)} x {int(MAX_PDF_MM)} mm / 200 in).\n"
+        f"        Increase -scale (minimum ~1:{min_scale}) or split the GPX track into smaller stages.",
+        file=sys.stderr,
+        flush=True,
+    )
+    sys.exit(1)
+
   if args.inosm:
     do_clip = True
     if os.path.exists(args.outosm) and not args.force:
@@ -978,18 +1019,6 @@ def main():
     raise FileNotFoundError(
         f"Clipped OSM file not found: {args.outosm}. Specify -inosm to generate it."
     )
-  map_w_mm = ((xmax - xmin) * 1000.0) / args.scale
-  map_h_mm = ((ymax - ymin) * 1000.0) / args.scale
-
-  layout = compute_legend_layout(map_h_mm)
-  margin_mm = 12.0
-  gap_mm = 5.0
-  legend_w_mm = layout["w_mm"]
-  legend_h_mm = layout["h_mm"]
-
-  body_h_mm = max(map_h_mm, legend_h_mm)
-  tot_w_mm = margin_mm + map_w_mm + gap_mm + legend_w_mm + margin_mm
-  tot_h_mm = margin_mm + body_h_mm + margin_mm
 
   fig = plt.figure(figsize=(tot_w_mm / 25.4, tot_h_mm / 25.4), dpi=300)
   ax_m = fig.add_axes((
@@ -1044,16 +1073,27 @@ def main():
   ax_m.set_xticks(xticks)
   ax_m.set_yticks(yticks)
   if args.show_grid:
-    ax_m.grid(
-        True, color="#1d63b8", linestyle="-", linewidth=0.45, alpha=0.72, zorder=98
+    ax_m.vlines(
+        xticks, ymin, ymax, color="#1d63b8", linestyle="-", linewidth=0.45, alpha=0.72, zorder=98
+    )
+    ax_m.hlines(
+        yticks, xmin, xmax, color="#1d63b8", linestyle="-", linewidth=0.45, alpha=0.72, zorder=98
     )
 
   bbox_poly = box(xmin, ymin, xmax, ymax)
 
   print(f"Loading OSM data: {args.outosm}", flush=True)
+
   points, lines, polygons = load_osm_data(
-      args.outosm, bbox_poly, names_path=args.exclude, utm_epsg=utm_epsg, debug=args.debug
+      args.outosm,
+      bbox_poly,
+      names_path=args.exclude,
+      filters_path=args.filters,
+      map_scale=args.scale,
+      utm_epsg=utm_epsg,
+      debug=args.debug,
   )
+
 
 
   print(
@@ -1062,20 +1102,24 @@ def main():
   )
 
   gdf_contours = None
-  if args.dtm and (
-      os.path.exists(args.dtm) or any(ch in args.dtm for ch in ("*", "?"))
-  ):
-    print(
-        f"Generating contour lines from DTM ({int(args.dtmsec)} m / {int(args.dtmmain)} m): {args.dtm}",
-        flush=True,
-    )
-    gdf_contours = generate_contours_from_dtm(
-        args.dtm,
-        bbox_poly,
-        step_m=args.dtmsec,
-        major_step_m=args.dtmmain,
-        utm_epsg=utm_epsg,
-    )
+  if args.dtm:
+    if os.path.exists(args.dtm) or any(ch in args.dtm for ch in ("*", "?")):
+      print(
+          f"Generating contour lines from DTM ({int(args.dtmsec)} m / {int(args.dtmmain)} m): {args.dtm}",
+          flush=True,
+      )
+      gdf_contours = generate_contours_from_dtm(
+          args.dtm,
+          bbox_poly,
+          step_m=args.dtmsec,
+          major_step_m=args.dtmmain,
+          utm_epsg=utm_epsg,
+      )
+    else:
+      print(
+          f"[WARNING] DTM path not found: '{args.dtm}'. Skipping contour line generation.",
+          flush=True,
+      )
   elif args.contours and os.path.exists(args.contours):
     print(f"Loading contour lines: {args.contours}", flush=True)
     _, gdf_contours, _ = load_osm_data(

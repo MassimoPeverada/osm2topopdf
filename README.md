@@ -33,6 +33,7 @@ Released under the **GNU General Public License v3.0 (GPLv3)**.
 - **Multilingual Legend & Axes:** Defaults to English (`-lang en`), with built-in support for Italian (`-lang it`), French (`-lang fr`), German (`-lang de`), and Spanish (`-lang es`), plus easy extensibility to other languages.
 - **Automatic UTM Zone Detection:** Automatically selects the appropriate WGS 84 UTM zone from the GPX track centroid (or accepts a manual zone such as `32N` or `19S`).
 - **Configurable UTM Coordinate Grid:** Displays 1,000 m UTM axis ticks along the map frame, with optional internal coordinate grid lines toggleable via `grid = on/off` in `osm2topopdf.ini`.
+- **GPX Track & Start Marker:** Draws the primary GPX route along with optional dashed red variants (`-trackvar`) and automatically places a checkered flag icon at the first point of the main track to highlight the starting location.
 
 ---
 
@@ -111,7 +112,7 @@ Running `python osm2topopdf.py` with no arguments prints the full help message a
 #### Supported DTM & Contour Format Specifications
 - **DTM File Format (`-dtm`):** **ESRI ASCII Grid** (`.asc` / `.ASC`) with standard 6-line header (`ncols`, `nrows`, `xllcorner`/`xllcenter`, `yllcorner`/`yllcenter`, `cellsize`, `nodata_value`). Both dot (`.`) and comma (`,`) decimal separators are supported.
 - **DTM Input Modes:** Accepts a single `.asc` file, a folder containing multiple `.asc` tiles (automatically mosaicked over the map bounding box), or a wildcard pattern (e.g., `./dtm/*.asc`).
-- **DTM Coordinate Reference System (CRS):** DTM coordinates must match the **projected UTM coordinate system** of the map (e.g., WGS 84 / UTM Zone 32N, `EPSG:32632`).
+- **DTM Coordinate Reference System (CRS):** Automatically reads accompanying `.prj` files and reprojects contours on the fly to match the map's UTM zone if needed (with empirical coordinate warnings when `.prj` is omitted).
 - **Pre-generated OSM XML Contours (`-contours`):** Standard OSM XML (`.osm`) in WGS 84 (`EPSG:4326`) containing ways tagged with `contour=elevation`, `ele=<meters>`, and optional `contour_ext=elevation_major` / `elevation_minor` (e.g., generated with `phyghtmap` / `pyhgtmap`).
 
 ### Map Layout, Scale & Language
@@ -129,10 +130,30 @@ Running `python osm2topopdf.py` with no arguments prints the full help message a
 
 ### Filtering & Custom Overrides
 
+> [!WARNING]
+> **Browser Auto-Translation Notice:** If you have automatic page translation enabled in your browser, **do not copy and paste** the contents of `.txt` configuration files (`names.txt`, `osmfilters.txt`, `labels.txt`) directly from the rendered GitHub page, as keywords and OSM tags may get translated and break rule parsing. Always download the files directly or use the **Raw** button on GitHub.
+
 | Option | Default | Description |
 | :--- | :--- | :--- |
 | `-exclude <file>` | `names.txt` | Optional text file to hide unwanted labels via text rules (`begins: text`, `equals: text`, `contains: text`) or OSM tag/area rules (`@exclude: key=val1,val2` with optional area filter). |
 | `-labels <file>` | `labels.txt` | Optional file for custom label coordinates, offsets, or priority overrides. |
+| `-filters <file>` | `osmfilters.txt` | Optional file to completely hide OSM features (node icons, ways, or polygons) matching tag, area, and scale rules (`key1=val1,val2; key2=val3; area < 1000; scale > 25000`), while keeping structural nodes intact. |
+
+---
+
+#### Geometric & Scale Feature Filters (`osmfilters.txt`)
+
+You can hide entire OSM elements (node icons, ways, or polygons) in `osmfilters.txt` (or any file passed via `-filters`) using semicolon-separated `AND` rules and comma-separated `OR` values. Filtered nodes remain in memory so connected ways and polygons stay intact, while `area` conditions are automatically ignored on non-polygon elements:
+
+    ' Hide aerialways / ski lifts
+    aerialway=*
+
+    ' Hide small first-aid hospital buildings or POIs
+    amenity=hospital; emergency=first_aid; area < 1000
+
+    ' Simplify urban clutter at overview scales (> 1:25,000)
+    building=*; area < 40; scale > 25000
+    highway=service; scale > 35000
 
 ---
 
@@ -194,7 +215,7 @@ English strings are built into `i18n.py`. To add another language (for example, 
 - `osm2topopdf.py` – Main CLI entry point, GPX loader, `pyosmium` clipper, and georeferenced PDF builder
 - `i18n.py` / `lang_*.json` – Internationalization loader and translations (`it`, `fr`, `de`, `es`)
 - `osm_loader.py` – OSM XML/PBF parser, multipolygon assembler, and spatial clipper
-- `dtm_contours.py` – Multi-tile ESRI `.asc` DTM reader and contour line generator
+- `dtm_contours.py` – Multi-tile ESRI `.asc` DTM reader with `.prj` auto-reprojection and contour line generator
 - `topo_polygons.py` – Landcover, water, protected areas, and building renderer
 - `topo_lines.py` – Roads, tracks, trails, railways, aerialways, waterways, and labeled contours renderer
 - `topo_points_labels.py` – Symbol placement and collision-free label engine
@@ -203,8 +224,10 @@ English strings are built into `i18n.py`. To add another language (for example, 
 - `topo_symbols.py` – Custom vector markers
 - `legend.py` – Adaptive single/two-column topographic map legend
 - `names.txt` – Sample universal OSM tag/area and text label exclusion rules
+- `osmfilters.txt` – Sample geometric and scale-based OSM feature filter rules
 
 ---
+
 ## License & Data Attribution
 
 - **Software:** Licensed under the GNU General Public License v3.0 (GPLv3).
@@ -240,6 +263,14 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 
 ## Changelog
 
+### v1.1.11 (2026-11-27)
+
+- Added geometric and scale-based OSM feature filtering (`osmfilters.txt` / `-filters`) to hide unwanted node icons, ways, or polygons using multi-tag `AND`/`OR` rules, polygon area thresholds, and map scale conditions (`scale > N` / `scale < N`) while keeping structural nodes intact.
+- Extended `names.txt` (`@exclude:`) to support multiple semicolon-separated `AND` tag conditions and `scale` thresholds alongside polygon `area` filters.
+- Added an early PDF maximum page dimension check (`5080 x 5080 mm` / `200 in` ISO 32000 limit) before OSM clipping, advising users to increase `-scale` or split oversized GPX tracks into smaller stages.
+- Added automatic `.prj` projection detection and on-the-fly reprojection for `.asc` DTM files (`pyproj`), empirical coordinate congruence warnings when `.prj` is missing (WGS84 degrees, Gauss-Boaga, feet), and graceful warnings if `-dtm` paths or `.asc` tiles are missing.
+- Documented the GPX start checkered flag marker and added a browser auto-translation warning for `.txt` configuration files in `README.md`.
+
 ### v1.1.10 (2026-11-26)
 
 - Added clickable PDF hyperlinks and Markdown link support in legend credits (`legend.py`).
@@ -254,7 +285,7 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 - Added automatic case-insensitive file matching for CLI path arguments (`-track`, `-trackvar`, `-inosm`, `-dtm`, `-contours`, `-exclude`, `-labels`, `-config`) across both Windows and Linux.
 - Enforced `-scale` range between `5000` and `75000` and extended `-symscale` proportional scaling to road, track, railway, and waterway widths (with slimmer `highway=service` styling to prevent parking-aisle clutter at 1:50,000).
 - Increased label deduplication radius to `400 m` for cleaner maps at overview scales and added an early file-lock check when the output PDF is already open.
-- Fix localized date formatting when -date is omitted.
+- Fixed localized date formatting when -date is omitted.
 
 ### v1.1.8 (2026-11-24)
 - Added automatic topological closing of clipped multipolygons along the map bounding box (enabling full rendering of large rivers, forests, and parks even with `-fast` and `-superfast`).

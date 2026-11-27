@@ -58,9 +58,150 @@ _NON_POI_HIGHWAY_VALS = {
 }
 
 
+
+# ==============================================================================
+# Numeric condition helpers (area / scale)
+# ==============================================================================
+def _parse_numeric_cond(cond_str, prefix):
+  rest = cond_str[len(prefix):].strip()
+  if rest.startswith("<="):
+    return "<=", float(rest[2:].strip())
+  if rest.startswith(">="):
+    return ">=", float(rest[2:].strip())
+  if rest.startswith("<"):
+    return "<", float(rest[1:].strip())
+  if rest.startswith(">"):
+    return ">", float(rest[1:].strip())
+  raise ValueError("missing < or > operator")
+
+
+def _check_numeric_cond(val, op, threshold):
+  if op == "<":
+    return val < threshold
+  if op == "<=":
+    return val <= threshold
+  if op == ">":
+    return val > threshold
+  if op == ">=":
+    return val >= threshold
+  return False
+
+
+# ==============================================================================
+# Geometric & feature filters (osmfilters.txt)
+# Syntax: key1=val1,val2; key2=val3; area < 1000; scale > 25000
+# ==============================================================================
+def load_osm_filters(filters_path="osmfilters.txt"):
+  rules = []
+  if not filters_path or not os.path.exists(filters_path):
+    return rules
+
+  with open(filters_path, "r", encoding="utf-8", errors="ignore") as f:
+    for line_num, line in enumerate(f, start=1):
+      s = line.strip()
+      if not s or s.startswith("'") or s.startswith("#"):
+        continue
+
+      parts = [p.strip() for p in s.split(";") if p.strip()]
+      if not parts:
+        continue
+
+      tag_conds = []
+      area_conds = []
+      scale_conds = []
+      valid_rule = True
+
+      for part in parts:
+        p_low = part.lower()
+        if p_low.startswith("area") and (len(p_low) == 4 or p_low[4] in " <>="):
+          try:
+            op, val = _parse_numeric_cond(p_low, "area")
+            area_conds.append((op, val))
+          except ValueError:
+            print(
+                f"[WARNING] {filters_path} (line {line_num}): invalid area condition '{part}'.",
+                flush=True,
+            )
+            valid_rule = False
+            break
+        elif p_low.startswith("scale") and (len(p_low) == 5 or p_low[5] in " <>="):
+          try:
+            op, val = _parse_numeric_cond(p_low, "scale")
+            scale_conds.append((op, val))
+          except ValueError:
+            print(
+                f"[WARNING] {filters_path} (line {line_num}): invalid scale condition '{part}'.",
+                flush=True,
+            )
+            valid_rule = False
+            break
+        elif "=" in part:
+          k, v_str = part.split("=", 1)
+          k = k.strip().lower()
+          vals = {v.strip().lower() for v in v_str.split(",") if v.strip()}
+          if not k or not vals:
+            print(
+                f"[WARNING] {filters_path} (line {line_num}): missing key or value in '{part}'.",
+                flush=True,
+            )
+            valid_rule = False
+            break
+          KEY_TAGS.add(k)
+          _NODE_POI_TAGS.add(k)
+          tag_conds.append((k, vals))
+        else:
+          print(
+              f"[WARNING] {filters_path} (line {line_num}): unrecognized condition '{part}'.",
+              flush=True,
+          )
+          valid_rule = False
+          break
+
+      if valid_rule and (tag_conds or area_conds or scale_conds):
+        rules.append({
+            "tags": tag_conds,
+            "area": area_conds,
+            "scale": scale_conds,
+        })
+
+  return rules
+
+
+def _is_feature_filtered(tags, filter_rules, geom=None, map_scale=25000):
+  if not filter_rules:
+    return False
+
+  is_polygon = geom is not None and geom.geom_type in ("Polygon", "MultiPolygon")
+  poly_area = None
+
+  for rule in filter_rules:
+    if rule["scale"]:
+      if not all(_check_numeric_cond(map_scale, op, thr) for op, thr in rule["scale"]):
+        continue
+
+    tags_match = True
+    for k, allowed_vals in rule["tags"]:
+      tv = tags.get(k, "").strip().lower()
+      if not tv or ("*" not in allowed_vals and tv not in allowed_vals):
+        tags_match = False
+        break
+    if not tags_match:
+      continue
+
+    if rule["area"] and is_polygon:
+      if poly_area is None:
+        poly_area = geom.area
+      if not all(_check_numeric_cond(poly_area, op, thr) for op, thr in rule["area"]):
+        continue
+
+    return True
+
+  return False
+
+
 # ==============================================================================
 # Filter to exclude label names by text rules (begins/equals/contains) or by OSM tag values
-# and polygon area thresholds (syntax: @exclude: key=val1,val2 [; area<1000])
+# and polygon area/scale thresholds (syntax: @exclude: key=val1,val2 [; area<1000] [; scale>25000])
 # ==============================================================================
 def load_exclusion_rules(names_path="names.txt"):
   text_rules = []
@@ -74,7 +215,7 @@ def load_exclusion_rules(names_path="names.txt"):
       if not s or s.startswith("'") or s.startswith("#"):
         continue
 
-      # Tag/area exclusion syntax: @exclude: key=val1,val2 [; area<1000]
+      # Tag/area/scale exclusion syntax: @exclude: key1=val1,val2 [; key2=val3] [; area<1000] [; scale>25000]
       if s.startswith("@"):
         if not s.lower().startswith("@exclude:"):
           print(
@@ -84,52 +225,64 @@ def load_exclusion_rules(names_path="names.txt"):
           continue
 
         expr = s[9:].strip()
-        max_area = None
-        if ";" in expr:
-          tag_part, cond_part = expr.split(";", 1)
-          cond_clean = cond_part.strip().lower().replace(" ", "")
-          if cond_clean.startswith("area<"):
+        parts = [p.strip() for p in expr.split(";") if p.strip()]
+        tag_conds = []
+        area_conds = []
+        scale_conds = []
+        valid_rule = True
+
+        for part in parts:
+          p_low = part.lower()
+          if p_low.startswith("area") and (len(p_low) == 4 or p_low[4] in " <>="):
             try:
-              max_area = float(cond_clean[5:])
+              op, val = _parse_numeric_cond(p_low, "area")
+              area_conds.append((op, val))
             except ValueError:
               print(
-                  f"[WARNING] {names_path} (line {line_num}): invalid area value in '{s}'.",
+                  f"[WARNING] {names_path} (line {line_num}): invalid area condition in '{s}'.",
                   flush=True,
               )
-              continue
+              valid_rule = False
+              break
+          elif p_low.startswith("scale") and (len(p_low) == 5 or p_low[5] in " <>="):
+            try:
+              op, val = _parse_numeric_cond(p_low, "scale")
+              scale_conds.append((op, val))
+            except ValueError:
+              print(
+                  f"[WARNING] {names_path} (line {line_num}): invalid scale condition in '{s}'.",
+                  flush=True,
+              )
+              valid_rule = False
+              break
+          elif "=" in part:
+            k, v_str = part.split("=", 1)
+            k = k.strip().lower()
+            vals = {v.strip().lower() for v in v_str.split(",") if v.strip()}
+            if not k or not vals:
+              print(
+                  f"[WARNING] {names_path} (line {line_num}): missing key or value in '{s}'.",
+                  flush=True,
+              )
+              valid_rule = False
+              break
+            KEY_TAGS.add(k)
+            _NODE_POI_TAGS.add(k)
+            tag_conds.append((k, vals))
           else:
             print(
-                f"[WARNING] {names_path} (line {line_num}): invalid condition in '{s}' (expected 'area<NUMBER').",
+                f"[WARNING] {names_path} (line {line_num}): invalid condition in '{s}'.",
                 flush=True,
             )
-            continue
-        else:
-          tag_part = expr
+            valid_rule = False
+            break
 
-        if "=" not in tag_part:
-          print(
-              f"[WARNING] {names_path} (line {line_num}): missing '=' in '{s}'.",
-              flush=True,
-          )
-          continue
-
-        k, v_str = tag_part.split("=", 1)
-        k = k.strip().lower()
-        vals = {v.strip().lower() for v in v_str.split(",") if v.strip()}
-        if not k or not vals:
-          print(
-              f"[WARNING] {names_path} (line {line_num}): missing key or value in '{s}'.",
-              flush=True,
-          )
-          continue
-
-        KEY_TAGS.add(k)
-        _NODE_POI_TAGS.add(k)
-        tag_rules.append({
-            "key": k,
-            "vals": vals,
-            "max_area": max_area,
-        })
+        if valid_rule and tag_conds:
+          tag_rules.append({
+              "tags": tag_conds,
+              "area": area_conds,
+              "scale": scale_conds,
+          })
         continue
 
       # Extended readable text rules: begins:, equals:, contains:
@@ -172,7 +325,7 @@ def clean_name(raw_name, exclusion_rules):
   return name
 
 
-def _filter_tag_name(raw_name, tags, excl_rules, tag_rules, geom=None):
+def _filter_tag_name(raw_name, tags, excl_rules, tag_rules, geom=None, map_scale=25000):
   name = clean_name(raw_name, excl_rules)
   if not name or not tag_rules:
     return name
@@ -181,21 +334,29 @@ def _filter_tag_name(raw_name, tags, excl_rules, tag_rules, geom=None):
   poly_area = None
 
   for rule in tag_rules:
-    tag_val = tags.get(rule["key"], "").strip().lower()
-    if not tag_val:
+    if rule["scale"]:
+      if not all(_check_numeric_cond(map_scale, op, thr) for op, thr in rule["scale"]):
+        continue
+
+    tags_match = True
+    for k, allowed_vals in rule["tags"]:
+      tv = tags.get(k, "").strip().lower()
+      if not tv or ("*" not in allowed_vals and tv not in allowed_vals):
+        tags_match = False
+        break
+    if not tags_match:
       continue
 
-    if "*" in rule["vals"] or tag_val in rule["vals"]:
-      max_area = rule["max_area"]
-      if max_area is None:
-        return ""
-      elif is_polygon:
-        if poly_area is None:
-          poly_area = geom.area
-        if poly_area < max_area:
-          return ""
+    if rule["area"] and is_polygon:
+      if poly_area is None:
+        poly_area = geom.area
+      if not all(_check_numeric_cond(poly_area, op, thr) for op, thr in rule["area"]):
+        continue
+
+    return ""
 
   return name
+
 def _extract_tags(elem):
   tags = {}
   for t in elem.findall("tag"):
@@ -366,12 +527,17 @@ def load_osm_data(
     osm_file,
     utm_bbox,
     names_path="names.txt",
+    filters_path="osmfilters.txt",
+    map_scale=25000,
     utm_epsg="EPSG:32632",
     debug=False,
 ):
   excl_rules, tag_rules = load_exclusion_rules(names_path)
   if names_path and os.path.exists(names_path):
     print(f"Loaded exclusion rules from: {names_path}", flush=True)
+  filter_rules = load_osm_filters(filters_path)
+  if filters_path and os.path.exists(filters_path):
+    print(f"Loaded OSM feature filters from: {filters_path}", flush=True)
   transformer = Transformer.from_crs("EPSG:4326", utm_epsg, always_xy=True)
 
   raw_nids = []
@@ -439,10 +605,17 @@ def load_osm_data(
       continue
     pt = Point(xy)
     if utm_bbox.contains(pt):
+      if _is_feature_filtered(tags, filter_rules, geom=pt, map_scale=map_scale):
+        continue
       rec = dict(tags)
       rec["_nid"] = nid
       rec["clean_name"] = _filter_tag_name(
-          tags.get("name", ""), tags, excl_rules, tag_rules, geom=pt
+          tags.get("name", ""),
+          tags,
+          excl_rules,
+          tag_rules,
+          geom=pt,
+          map_scale=map_scale,
       )
       rec["geometry"] = pt
       point_records.append(rec)
@@ -493,18 +666,32 @@ def load_osm_data(
       if not geom.is_valid:
         geom = geom.buffer(0)
       if not geom.is_empty and geom.intersects(utm_bbox):
+        if _is_feature_filtered(tags, filter_rules, geom=geom, map_scale=map_scale):
+          continue
         rec = dict(tags)
         rec["clean_name"] = _filter_tag_name(
-            tags.get("name", ""), tags, excl_rules, tag_rules, geom=geom
+            tags.get("name", ""),
+            tags,
+            excl_rules,
+            tag_rules,
+            geom=geom,
+            map_scale=map_scale,
         )
         rec["geometry"] = geom
         polygon_records.append(rec)
     else:
       geom = LineString(coords)
       if not geom.is_empty and geom.intersects(utm_bbox):
+        if _is_feature_filtered(tags, filter_rules, geom=geom, map_scale=map_scale):
+          continue
         rec = dict(tags)
         rec["clean_name"] = _filter_tag_name(
-            tags.get("name", ""), tags, excl_rules, tag_rules, geom=geom
+            tags.get("name", ""),
+            tags,
+            excl_rules,
+            tag_rules,
+            geom=geom,
+            map_scale=map_scale,
         )
         rec["geometry"] = geom
         line_records.append(rec)
@@ -531,9 +718,16 @@ def load_osm_data(
           continue
         geom_w = LineString(coords)
         if not geom_w.is_empty and geom_w.intersects(utm_bbox):
+          if _is_feature_filtered(tags, filter_rules, geom=geom_w, map_scale=map_scale):
+            continue
           rec = dict(tags)
           rec["clean_name"] = _filter_tag_name(
-              tags.get("name", ""), tags, excl_rules, tag_rules, geom=geom_w
+              tags.get("name", ""),
+              tags,
+              excl_rules,
+              tag_rules,
+              geom=geom_w,
+              map_scale=map_scale,
           )
           rec["geometry"] = geom_w
           line_records.append(rec)
@@ -565,9 +759,16 @@ def load_osm_data(
         and not geom_rel.is_empty
         and geom_rel.intersects(utm_bbox)
     ):
+      if _is_feature_filtered(tags, filter_rules, geom=geom_rel, map_scale=map_scale):
+        continue
       rec = dict(tags)
       rec["clean_name"] = _filter_tag_name(
-          tags.get("name", ""), tags, excl_rules, tag_rules, geom=geom_rel
+          tags.get("name", ""),
+          tags,
+          excl_rules,
+          tag_rules,
+          geom=geom_rel,
+          map_scale=map_scale,
       )
       rec["geometry"] = geom_rel
       polygon_records.append(rec)
@@ -598,3 +799,4 @@ def load_osm_data(
 
   gc.collect()
   return gdf_points, gdf_lines, gdf_polygons
+

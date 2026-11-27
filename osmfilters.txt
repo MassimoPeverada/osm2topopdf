@@ -1,0 +1,27 @@
+' ==============================================================================
+' osmfilters.txt - Geometric and Scale-Based OSM Feature Filters for osm2topopdf
+' ==============================================================================
+' Syntax:
+'   key1=val1,val2; key2=val3; area < 1000; scale > 25000
+'
+' Notes:
+'   - Rules hide the entire feature (node icon, way, or polygon + label).
+'   - Structural nodes are kept in memory so connected ways/polygons stay intact.
+'   - 'area' (in square meters) applies only to polygons/multipolygons and is
+'     automatically ignored for nodes and ways.
+'   - 'scale' compares against the map scale denominator (-scale, e.g. 25000, 50000).
+'   - Lines starting with ' or # are comments.
+' ==============================================================================
+
+' Hide first-aid stations / sports infirmaries while keeping major hospitals
+amenity=first_aid
+amenity=hospital; emergency=first_aid,yes; area < 1000
+
+' Hide aerialways / ski lifts completely (uncomment if needed)
+' aerialway=*
+
+' Simplify dense urban clutter at overview scales (> 1:25,000 / > 1:40,000)
+' building=*; area < 150; scale > 25000
+' building=*; area < 1000; scale > 40000
+' highway=service; scale > 35000
+' barrier=gate; scale > 25000

@@ -468,7 +468,7 @@ def draw_legend(
     date_str="",
     credits_text="",
     utm_label="UTM 32N",
-    version="1.1.7",
+    version="",
     dtmmain=100,
     dtmsec=25,
 ):

@@ -4,8 +4,10 @@ import os
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
+from pyproj import CRS, Transformer
 from scipy.ndimage import gaussian_filter
 from shapely.geometry import LineString, box
+from shapely.ops import transform as shp_transform
 
 
 def _read_asc_header(f):
@@ -38,7 +40,52 @@ def _resolve_asc_list(dtm_path):
     return sorted(glob.glob(dtm_path))
   if os.path.isfile(dtm_path):
     return [dtm_path]
-  raise FileNotFoundError(f"DTM path not found: {dtm_path}")
+  return []
+
+
+def _find_prj_crs(asc_path):
+  base, _ = os.path.splitext(asc_path)
+  for ext in (".prj", ".PRJ"):
+    prj_path = base + ext
+    if os.path.isfile(prj_path):
+      try:
+        with open(prj_path, "r", encoding="utf-8", errors="ignore") as f:
+          wkt = f.read().strip()
+        if wkt:
+          return CRS.from_wkt(wkt), prj_path
+      except Exception as exc:
+        print(
+            f"[WARNING] Unreadable .prj file '{prj_path}': {exc}",
+            flush=True,
+        )
+  return None, None
+def _check_empirical_utm_congruence(tile, utm_epsg):
+  x_mid = 0.5 * (tile["x0"] + tile["x_right"])
+  y_mid = 0.5 * (tile["y0"] + tile["y_top"])
+  name = os.path.basename(tile["path"])
+
+  if -180.0 <= x_mid <= 180.0 and -90.0 <= y_mid <= 90.0:
+    return (
+        f"[WARNING] DTM '{name}' has no .prj file and its coordinates "
+        f"(X={x_mid:.4f}, Y={y_mid:.4f}) look like geographic degrees "
+        f"(WGS84 / EPSG:4326) rather than projected {utm_epsg} meters."
+    )
+
+  if 1300000.0 <= x_mid <= 2800000.0 and 4000000.0 <= y_mid <= 5500000.0:
+    return (
+        f"[WARNING] DTM '{name}' has no .prj file and its coordinates "
+        f"(X={int(x_mid)}, Y={int(y_mid)}) look like Italian Gauss-Boaga / "
+        f"Monte Mario (EPSG:3003/3004) rather than {utm_epsg}."
+    )
+
+  if not (100000.0 <= x_mid <= 900000.0 and -10000000.0 <= y_mid <= 10000000.0):
+    return (
+        f"[WARNING] DTM '{name}' has no .prj file and its coordinates "
+        f"(X={int(x_mid)}, Y={int(y_mid)}) fall outside standard UTM meter "
+        f"bounds (possible feet units or local grid instead of {utm_epsg})."
+    )
+
+  return None
 
 
 def _inspect_asc_tile(asc_path):
@@ -52,6 +99,7 @@ def _inspect_asc_tile(asc_path):
   y0 = hdr["yllcenter"] if "yllcenter" in hdr else hdr["yllcorner"] + 0.5 * cs
   y_top = y0 + (nrows - 1) * cs
   x_right = x0 + (ncols - 1) * cs
+  crs_obj, prj_path = _find_prj_crs(asc_path)
   return {
       "path": asc_path,
       "ncols": ncols,
@@ -62,12 +110,27 @@ def _inspect_asc_tile(asc_path):
       "y0": y0,
       "y_top": y_top,
       "x_right": x_right,
+      "crs": crs_obj,
+      "prj_path": prj_path,
       "bbox": box(
           x0 - 0.5 * cs, y0 - 0.5 * cs, x_right + 0.5 * cs, y_top + 0.5 * cs
       ),
   }
 
 
+def _crs_matches_target(src_crs, target_crs):
+  if src_crs is None:
+    return True
+  if src_crs.equals(target_crs):
+    return True
+  src_epsg = src_crs.to_epsg()
+  tgt_epsg = target_crs.to_epsg()
+  if src_epsg and tgt_epsg and src_epsg == tgt_epsg:
+    return True
+  if src_epsg and tgt_epsg:
+    if (32601 <= tgt_epsg <= 32660) and src_epsg == (25800 + (tgt_epsg - 32600)):
+      return True
+  return False
 def generate_contours_from_dtm(
     dtm_path,
     utm_bbox,
@@ -79,28 +142,63 @@ def generate_contours_from_dtm(
 ):
   asc_files = _resolve_asc_list(dtm_path)
   if not asc_files:
-    raise FileNotFoundError(f"No .asc files found in: {dtm_path}")
+    print(
+        f"[WARNING] No DTM (.asc) files found in '{dtm_path}'. "
+        "Skipping contour line generation.",
+        flush=True,
+    )
+    return gpd.GeoDataFrame(columns=["geometry"], crs=utm_epsg)
 
+  target_crs = CRS.from_user_input(utm_epsg)
   xmin, ymin, xmax, ymax = utm_bbox.bounds
   pad_m = 150.0
-  q_xmin = xmin - pad_m
-  q_xmax = xmax + pad_m
-  q_ymin = ymin - pad_m
-  q_ymax = ymax + pad_m
-  query_box = box(q_xmin, q_ymin, q_xmax, q_ymax)
+  query_box_utm = box(xmin - pad_m, ymin - pad_m, xmax + pad_m, ymax + pad_m)
 
-  valid_tiles = []
+  inspected = []
+  warned_empirical = set()
   for fp in asc_files:
     try:
       info = _inspect_asc_tile(fp)
-      if info["bbox"].intersects(query_box):
-        valid_tiles.append(info)
+      if info["crs"] is None:
+        emp_msg = _check_empirical_utm_congruence(info, utm_epsg)
+        if emp_msg and emp_msg not in warned_empirical:
+          print(emp_msg, flush=True)
+          warned_empirical.add(emp_msg)
+      inspected.append(info)
     except Exception as exc:
-      print(f"Warning: skipping unreadable DTM file '{fp}': {exc}", flush=True)
+      print(f"[WARNING] Skipping unreadable DTM file '{fp}': {exc}", flush=True)
+
+  if not inspected:
+    print(
+        f"[WARNING] No valid DTM (.asc) files could be read from '{dtm_path}'. "
+        "Skipping contour line generation.",
+        flush=True,
+    )
+    return gpd.GeoDataFrame(columns=["geometry"], crs=utm_epsg)
+
+  src_crs = next((t["crs"] for t in inspected if t["crs"] is not None), None)
+  need_reproject = src_crs is not None and not _crs_matches_target(src_crs, target_crs)
+
+  if need_reproject:
+    to_src = Transformer.from_crs(target_crs, src_crs, always_xy=True).transform
+    to_utm = Transformer.from_crs(src_crs, target_crs, always_xy=True).transform
+    query_box_src = shp_transform(to_src, query_box_utm)
+    src_label = src_crs.to_string() if src_crs.to_epsg() else src_crs.name
+    print(
+        f"DTM projection from .prj ({src_label}) differs from map ({utm_epsg}): "
+        "reprojecting contours automatically...",
+        flush=True,
+    )
+  else:
+    to_utm = None
+    query_box_src = query_box_utm
+
+  valid_tiles = [t for t in inspected if t["bbox"].intersects(query_box_src)]
 
   if not valid_tiles:
     print(
-        "Warning: map bounding box is outside the extent of provided DTM files.",
+        "[WARNING] Map bounding box is outside the extent of provided DTM files. "
+        "Skipping contour line generation.",
         flush=True,
     )
     return gpd.GeoDataFrame(columns=["geometry"], crs=utm_epsg)
@@ -109,6 +207,7 @@ def generate_contours_from_dtm(
     names = ", ".join(os.path.basename(t["path"]) for t in valid_tiles)
     print(f"DTM mosaic from {len(valid_tiles)} tiles: {names}", flush=True)
 
+  q_xmin, q_ymin, q_xmax, q_ymax = query_box_src.bounds
   ref = next(iter(valid_tiles))
   cs = ref["cs"]
   c0_glob = int(math.floor((q_xmin - ref["x0"]) / cs))
@@ -154,7 +253,7 @@ def generate_contours_from_dtm(
         if vals.size < c_end + 1:
           continue
 
-        row_slice = vals[c_start : c_end + 1]
+        row_slice = vals[slice(c_start, c_end + 1)]
         valid = ~np.isclose(row_slice, tile["nodata"])
         if not np.any(valid):
           continue
@@ -202,6 +301,8 @@ def generate_contours_from_dtm(
         if len(seg) < 2:
           continue
         ls = LineString(seg)
+        if need_reproject and to_utm is not None:
+          ls = shp_transform(to_utm, ls)
         if ls.is_empty or ls.length < min_length_m:
           continue
         if not ls.intersects(utm_bbox):
