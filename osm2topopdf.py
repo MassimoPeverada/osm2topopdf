@@ -22,6 +22,8 @@ from dtm_contours import generate_contours_from_dtm
 import geopandas as gpd
 from i18n import load_language
 from legend import compute_legend_layout, draw_legend
+import matplotlib
+matplotlib.use("Agg")
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
@@ -1020,7 +1022,7 @@ def main():
         f"Clipped OSM file not found: {args.outosm}. Specify -inosm to generate it."
     )
 
-  fig = plt.figure(figsize=(tot_w_mm / 25.4, tot_h_mm / 25.4), dpi=300)
+  fig = plt.figure(figsize=(tot_w_mm / 25.4, tot_h_mm / 25.4))
   ax_m = fig.add_axes((
       margin_mm / tot_w_mm,
       (margin_mm + body_h_mm - map_h_mm) / tot_h_mm,
