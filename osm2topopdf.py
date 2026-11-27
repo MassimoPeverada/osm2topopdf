@@ -1023,6 +1023,8 @@ def main():
     )
 
   fig = plt.figure(figsize=(tot_w_mm / 25.4, tot_h_mm / 25.4))
+  fig.canvas.draw_idle = lambda *args, **kwargs: None
+  fig.canvas.draw = lambda *args, **kwargs: None
   ax_m = fig.add_axes((
       margin_mm / tot_w_mm,
       (margin_mm + body_h_mm - map_h_mm) / tot_h_mm,

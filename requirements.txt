@@ -6,5 +6,5 @@ pyproj>=3.6.0
 matplotlib>=3.8.0
 numpy>=1.26.0
 scipy>=1.11.0
-osmium>=4.0.0
 pypdf>=4.0.0
+osmium>=4.0.0     # Optional: required only when clipping .osm.pbf files (-inosm)

@@ -41,14 +41,34 @@ Released under the **GNU General Public License v3.0 (GPLv3)**.
 
 Requires **Python 3.10 or higher** (tested on Python 3.13).
 
-1. Clone or download this repository:
-   ```bash
-   git clone https://github.com/MassimoPeverada/osm2topopdf.git
-   cd osm2topopdf
-   ```
+1. **Download the repository:**
+   * **Option A (ZIP download – no Git required):** Click the green **Code** button at the top of the GitHub page -> **Download ZIP**, extract it to a local folder (e.g., `C:\osm2topopdf`), and open a terminal inside that folder.
+   * **Option B (using Git):**
+     ```cmd
+     git clone https://github.com/MassimoPeverada/osm2topopdf.git
+     cd osm2topopdf
+     ```
 
-2. Install the required Python libraries:
-   ```bash
+2. *(Recommended)* **Create and activate a virtual environment** to avoid system permission errors (`PermissionError: [Errno 13]` on Windows 11 / Linux / macOS):
+   * **Windows (Command Prompt):**
+     ```cmd
+     python -m venv venv
+     venv\Scripts\activate
+     ```
+   * **Linux / macOS:**
+     ```bash
+     python3 -m venv venv
+     source venv/bin/activate
+     ```
+
+3. *(Optional)* **Ensure `pip` is installed** (if missing on your system):
+   ```cmd
+   python -m ensurepip --upgrade
+   ```
+   *(On Debian/Ubuntu Linux, you may also need `sudo apt install python3-pip python3-venv` before creating the virtual environment.)*
+
+4. **Install the required Python libraries:**
+   ```cmd
    pip install -r requirements.txt
    ```
 
@@ -269,6 +289,7 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 - Extended `names.txt` (`@exclude:`) to support multiple semicolon-separated `AND` tag conditions and `scale` thresholds alongside polygon `area` filters.
 - Added an early PDF maximum page dimension check (`5080 x 5080 mm` / `200 in` ISO 32000 limit) before OSM clipping, advising users to increase `-scale` or split oversized GPX tracks into smaller stages.
 - Added automatic `.prj` projection detection and on-the-fly reprojection for `.asc` DTM files (`pyproj`), empirical coordinate congruence warnings when `.prj` is missing (WGS84 degrees, Gauss-Boaga, feet), and graceful warnings if `-dtm` paths or `.asc` tiles are missing.
+- Improved vector rendering performance on large-format maps (e.g., 1:10,000) by disabling intermediate Matplotlib Agg canvas redraws during layer construction (`osm2topopdf.py`), preventing freezes and speeding up PDF generation up to 10x–30x.
 - Documented the GPX start checkered flag marker and added a browser auto-translation warning for `.txt` configuration files in `README.md`.
 
 ### v1.1.10 (2026-11-26)
