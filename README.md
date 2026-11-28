@@ -84,6 +84,8 @@ Requires **Python 3.10 or higher** (tested on Python 3.13).
 
 ## Quick Start
 
+*(Note: On Linux/macOS, replace `python` with `python3` if you are not running inside an activated virtual environment.)*
+
 ### 1. Basic map from an already clipped `.osm` file
 ```bash
 python osm2topopdf.py -track my_hike.gpx -outosm area.osm -outpdf my_hike.pdf
