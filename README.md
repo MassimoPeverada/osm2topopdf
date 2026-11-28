@@ -48,6 +48,9 @@ Requires **Python 3.10 or higher** (tested on Python 3.13).
      git clone https://github.com/MassimoPeverada/osm2topopdf.git
      cd osm2topopdf
      ```
+     *(To install Git on Windows via terminal:
+     winget install --id Git.Git -e --source winget    
+     After installation, close and reopen Command Prompt or PowerShell so Windows recognizes the new git command.)*
 
 2. *(Recommended)* **Create and activate a virtual environment** to avoid system permission errors (`PermissionError: [Errno 13]` on Windows 11 / Linux / macOS):
    * **Windows (Command Prompt):**
@@ -62,10 +65,15 @@ Requires **Python 3.10 or higher** (tested on Python 3.13).
      ```
 
 3. *(Optional)* **Ensure `pip` is installed** (if missing on your system):
-   ```cmd
-   python -m ensurepip --upgrade
-   ```
-   *(On Debian/Ubuntu Linux, you may also need `sudo apt install python3-pip python3-venv` before creating the virtual environment.)*
+   * **Windows:**
+     ```cmd
+     python -m ensurepip --upgrade
+     ```
+   * **Linux / macOS:**
+     ```bash
+     python3 -m ensurepip --upgrade
+     ```
+     *(On Debian/Ubuntu Linux, you may also need `sudo apt install python3-pip python3-venv` before creating the virtual environment.)*
 
 4. **Install the required Python libraries:**
    ```cmd
