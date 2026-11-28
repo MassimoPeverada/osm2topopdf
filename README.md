@@ -287,6 +287,7 @@ Save the downloaded `.osm.pbf` file locally and pass it via `-inosm <file.osm.pb
 
 Planned features and improvements for upcoming releases (v1.2.0+):
 
+- **Garmin GPX Track Color Support & Legend Entries (`gpxx:DisplayColor`):** Automatically read `<gpxx:DisplayColor>` extensions and `<name>` labels from GPX tracks or segments (exported by Garmin BaseCamp, MapSource, or GPS devices) to render each route/segment in its assigned color and list its color swatch and name in the map legend, falling back to default styling when unspecified.
 - **Layer & Feature Filtering (`layers` in `osm2topopdf.ini`):** Toggle individual map layers (`buildings`, `landcover`, `contours`, `roads`, `trails`, `railways`, `waterways`, `poi_shops`, `labels`) on or off without editing code.
 - **GeoTIFF DEM Support:** Add native support for `.tif` / `.tiff` Digital Elevation Models alongside ESRI ASCII Grid (`.asc`).
 - **Additional Language Packs:** Community translations (e.g., Portuguese, Dutch, Polish) via `lang_<code>.json` files.
