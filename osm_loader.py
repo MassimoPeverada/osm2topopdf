@@ -105,7 +105,7 @@ def load_osm_filters(filters_path="osmfilters.txt"):
 
       for part in parts:
         p_low = part.lower()
-        if p_low.startswith("area") and (len(p_low) == 4 or p_low in " <>="):
+        if p_low == "area" or p_low.startswith(("area<", "area>", "area=", "area ")):
           try:
             op, val = _parse_numeric_cond(p_low, "area")
             area_conds.append((op, val))
@@ -116,7 +116,7 @@ def load_osm_filters(filters_path="osmfilters.txt"):
             )
             valid_rule = False
             break
-        elif p_low.startswith("scale") and (len(p_low) == 5 or p_low in " <>="):
+        elif p_low == "scale" or p_low.startswith(("scale<", "scale>", "scale=", "scale ")):
           try:
             op, val = _parse_numeric_cond(p_low, "scale")
             scale_conds.append((op, val))
@@ -157,6 +157,7 @@ def load_osm_filters(filters_path="osmfilters.txt"):
         })
 
   return rules
+
 def _is_feature_filtered(tags, filter_rules, geom=None, map_scale=25000):
   if not filter_rules:
     return False
@@ -218,7 +219,7 @@ def load_exclusion_rules(names_path="names.txt"):
 
         for part in parts:
           p_low = part.lower()
-          if p_low.startswith("area") and (len(p_low) == 4 or p_low in " <>="):
+          if p_low == "area" or p_low.startswith(("area<", "area>", "area=", "area ")):
             try:
               op, val = _parse_numeric_cond(p_low, "area")
               area_conds.append((op, val))
@@ -229,7 +230,7 @@ def load_exclusion_rules(names_path="names.txt"):
               )
               valid_rule = False
               break
-          elif p_low.startswith("scale") and (len(p_low) == 5 or p_low in " <>="):
+          elif p_low == "scale" or p_low.startswith(("scale<", "scale>", "scale=", "scale ")):
             try:
               op, val = _parse_numeric_cond(p_low, "scale")
               scale_conds.append((op, val))
