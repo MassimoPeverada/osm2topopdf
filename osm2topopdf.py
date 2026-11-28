@@ -7,7 +7,7 @@ Python and integrated with the help of Gemini.
 Released under GPLv3.
 """
 
-VERSION = "1.1.11"
+VERSION = "1.1.12"
 print(f"Starting osm2topopdf v{VERSION} cartographic engine...", flush=True)
 import argparse
 import configparser

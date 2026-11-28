@@ -293,6 +293,12 @@ Planned features and improvements for upcoming releases (v1.2.0+):
 
 ## Changelog
 
+### v1.1.12 (2026-11-28)
+
+- Prioritized primary POI roles (`historic=castle`, `tourism=alpine_hut`, `amenity=place_of_worship`, `railway=station`, etc.) over secondary `place=*` context tags during node classification (`topo_classifier.py`), preventing POI icons and compact labels from being overridden by large settlement/locality fonts.
+- Updated `historic_castle` label styling to `Text4` (`topo_labels_config.py`) and added polygon classification support for `building=castle`, `amenity=castle`, and `building=alpine_hut` (`topo_classifier.py`).
+- Added `"historic"` to closed-way polygon area tags and skipped `boundary=administrative` relations during OSM parsing (`osm_loader.py`) so standalone historic polygons render with their proper symbol and label without administrative boundary overhead.
+
 ### v1.1.11 (2026-11-27)
 
 - Added geometric and scale-based OSM feature filtering (`osmfilters.txt` / `-filters`) to hide unwanted node icons, ways, or polygons using multi-tag `AND`/`OR` rules, polygon area thresholds, and map scale conditions (`scale > N` / `scale < N`) while keeping structural nodes intact.

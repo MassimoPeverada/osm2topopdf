@@ -58,10 +58,6 @@ _NON_POI_HIGHWAY_VALS = {
 }
 
 
-
-# ==============================================================================
-# Numeric condition helpers (area / scale)
-# ==============================================================================
 def _parse_numeric_cond(cond_str, prefix):
   rest = cond_str[len(prefix):].strip()
   if rest.startswith("<="):
@@ -87,10 +83,6 @@ def _check_numeric_cond(val, op, threshold):
   return False
 
 
-# ==============================================================================
-# Geometric & feature filters (osmfilters.txt)
-# Syntax: key1=val1,val2; key2=val3; area < 1000; scale > 25000
-# ==============================================================================
 def load_osm_filters(filters_path="osmfilters.txt"):
   rules = []
   if not filters_path or not os.path.exists(filters_path):
@@ -113,7 +105,7 @@ def load_osm_filters(filters_path="osmfilters.txt"):
 
       for part in parts:
         p_low = part.lower()
-        if p_low.startswith("area") and (len(p_low) == 4 or p_low[4] in " <>="):
+        if p_low.startswith("area") and (len(p_low) == 4 or p_low in " <>="):
           try:
             op, val = _parse_numeric_cond(p_low, "area")
             area_conds.append((op, val))
@@ -124,7 +116,7 @@ def load_osm_filters(filters_path="osmfilters.txt"):
             )
             valid_rule = False
             break
-        elif p_low.startswith("scale") and (len(p_low) == 5 or p_low[5] in " <>="):
+        elif p_low.startswith("scale") and (len(p_low) == 5 or p_low in " <>="):
           try:
             op, val = _parse_numeric_cond(p_low, "scale")
             scale_conds.append((op, val))
@@ -165,8 +157,6 @@ def load_osm_filters(filters_path="osmfilters.txt"):
         })
 
   return rules
-
-
 def _is_feature_filtered(tags, filter_rules, geom=None, map_scale=25000):
   if not filter_rules:
     return False
@@ -199,10 +189,6 @@ def _is_feature_filtered(tags, filter_rules, geom=None, map_scale=25000):
   return False
 
 
-# ==============================================================================
-# Filter to exclude label names by text rules (begins/equals/contains) or by OSM tag values
-# and polygon area/scale thresholds (syntax: @exclude: key=val1,val2 [; area<1000] [; scale>25000])
-# ==============================================================================
 def load_exclusion_rules(names_path="names.txt"):
   text_rules = []
   tag_rules = []
@@ -215,7 +201,6 @@ def load_exclusion_rules(names_path="names.txt"):
       if not s or s.startswith("'") or s.startswith("#"):
         continue
 
-      # Tag/area/scale exclusion syntax: @exclude: key1=val1,val2 [; key2=val3] [; area<1000] [; scale>25000]
       if s.startswith("@"):
         if not s.lower().startswith("@exclude:"):
           print(
@@ -233,7 +218,7 @@ def load_exclusion_rules(names_path="names.txt"):
 
         for part in parts:
           p_low = part.lower()
-          if p_low.startswith("area") and (len(p_low) == 4 or p_low[4] in " <>="):
+          if p_low.startswith("area") and (len(p_low) == 4 or p_low in " <>="):
             try:
               op, val = _parse_numeric_cond(p_low, "area")
               area_conds.append((op, val))
@@ -244,7 +229,7 @@ def load_exclusion_rules(names_path="names.txt"):
               )
               valid_rule = False
               break
-          elif p_low.startswith("scale") and (len(p_low) == 5 or p_low[5] in " <>="):
+          elif p_low.startswith("scale") and (len(p_low) == 5 or p_low in " <>="):
             try:
               op, val = _parse_numeric_cond(p_low, "scale")
               scale_conds.append((op, val))
@@ -285,7 +270,6 @@ def load_exclusion_rules(names_path="names.txt"):
           })
         continue
 
-      # Extended readable text rules: begins:, equals:, contains:
       if ":" in s:
         prefix, val = s.split(":", 1)
         p_low = prefix.strip().lower()
@@ -356,7 +340,6 @@ def _filter_tag_name(raw_name, tags, excl_rules, tag_rules, geom=None, map_scale
     return ""
 
   return name
-
 def _extract_tags(elem):
   tags = {}
   for t in elem.findall("tag"):
@@ -547,7 +530,6 @@ def load_osm_data(
   raw_ways = []
   rel_map = {}
 
-  # Stream XML with iterparse and clear elements immediately to keep RAM low
   context = ET.iterparse(osm_file, events=("end",))
   for _, elem in context:
     tag_name = elem.tag
@@ -558,12 +540,10 @@ def load_osm_data(
       raw_lats.append(float(elem.attrib["lat"]))
       tags = _extract_tags(elem)
       if tags and any(k in _NODE_POI_TAGS for k in tags):
-        # Skip standalone traffic/road furniture nodes (e.g. street lamps, crossings) to save RAM
         if not (len(tags) == 1 and tags.get("highway") in _NON_POI_HIGHWAY_VALS):
           poi_candidates.append((nid, tags))
       elem.clear()
     elif tag_name == "way":
-
       wid = elem.attrib.get("id")
       way_nids = [nd.attrib.get("ref") for nd in elem.findall("nd")]
       tags = _extract_tags(elem)
@@ -584,7 +564,6 @@ def load_osm_data(
         rel_map[rid] = {"tags": tags, "members": members}
       elem.clear()
 
-  # Vectorized coordinate projection in one pass
   if raw_nids:
     xs, ys = transformer.transform(
         np.asarray(raw_lons, dtype=np.float64),
@@ -652,6 +631,7 @@ def load_osm_data(
                     "aeroway",
                     "power",
                     "boundary",
+                    "historic",
                 )
             )
             or tags.get("waterway") in ("riverbank", "dock", "boatyard")
@@ -707,6 +687,9 @@ def load_osm_data(
 
   for rel_id, rel_info in rel_map.items():
     tags = rel_info["tags"]
+
+    if tags.get("boundary") == "administrative":
+      continue
 
     if tags.get("route") in ("hiking", "foot", "mtb", "bicycle", "road") or (
         tags.get("type") == "route" and "route" in tags
@@ -799,4 +782,3 @@ def load_osm_data(
 
   gc.collect()
   return gdf_points, gdf_lines, gdf_polygons
-

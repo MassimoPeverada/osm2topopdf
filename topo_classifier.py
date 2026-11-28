@@ -16,19 +16,6 @@ def classify_feature(row, is_node=False):
   geom = row.geometry
 
   if is_node:
-    place = _val(row, "place")
-    if place in (
-        "city",
-        "town",
-        "village",
-        "suburb",
-        "hamlet",
-        "isolated_dwelling",
-        "farm",
-        "locality",
-    ):
-      return f"place_{place}", name, ""
-
     nat = _val(row, "natural")
     if nat in ("peak", "saddle"):
       return f"natural_{nat}", name, f"{ele} m" if ele else ""
@@ -52,7 +39,11 @@ def classify_feature(row, is_node=False):
       return "railway_station", name, ""
 
     hist = _val(row, "historic")
-    if hist in ("castle", "memorial", "wayside_shrine", "wayside_cross"):
+    amen = _val(row, "amenity")
+    bld = _val(row, "building")
+    if hist == "castle" or amen == "castle" or bld == "castle":
+      return "historic_castle", name, ""
+    if hist in ("memorial", "wayside_shrine", "wayside_cross"):
       tag_h = (
           "historic_wayside_shrine"
           if "wayside" in hist
@@ -62,7 +53,6 @@ def classify_feature(row, is_node=False):
     if hist in ("ruins", "city_gate", "monument", "archaeological_site") and name:
       return "historic", name, ""
 
-    amen = _val(row, "amenity")
     if amen in ("drinking_water", "place_of_worship", "fountain"):
       return f"amenity_{amen}", name, ""
     if amen == "hospital":
@@ -78,6 +68,8 @@ def classify_feature(row, is_node=False):
           name,
           "",
       )
+    if bld == "alpine_hut":
+      return "alpine_hut", name, ""
     if tour in ("attraction", "zoo") and name:
       return "tourism_attraction", name, ""
 
@@ -96,6 +88,20 @@ def classify_feature(row, is_node=False):
 
     if _val(row, "ford") == "yes" and name:
       return "ford", name, ""
+
+    # Fallback: solo se il nodo non è già un POI specifico, usa place=*
+    place = _val(row, "place")
+    if place in (
+        "city",
+        "town",
+        "village",
+        "suburb",
+        "hamlet",
+        "isolated_dwelling",
+        "farm",
+        "locality",
+    ):
+      return f"place_{place}", name, ""
 
     return None, "", ""
 
@@ -160,11 +166,11 @@ def classify_feature(row, is_node=False):
 
   if bld in ("church", "chapel") or amen == "place_of_worship" or hist == "monastery":
     return "amenity_place_of_worship", name, ""
-  if hist == "castle":
+  if hist == "castle" or bld == "castle" or amen == "castle":
     return "historic_castle", name, ""
   if hist in ("ruins", "archaeological_site") and name:
     return "historic", name, ""
-  if tour == "alpine_hut":
+  if tour == "alpine_hut" or bld == "alpine_hut":
     return "alpine_hut", name, ""
   if tour == "camp_site":
     return "camp_site", name, ""

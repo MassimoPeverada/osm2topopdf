@@ -34,7 +34,7 @@ KHARTUM_RULES = {
     "natural_water": (138, "Text4B", None, 0, False),
     "waterway_river": (136, "Text4B", None, 0, False),
     "hospital": (134, "Text4", "s", 32, True),
-    "historic_castle": (140, "Text5", TOPO_MARKERS["castle"], 26, True),
+    "historic_castle": (128, "Text4", TOPO_MARKERS["castle"], 26, True),
     "amenity_place_of_worship": (120, "Text4", TOPO_MARKERS["church"], 26, True),
     "waterway_canal": (115, "Text4B", None, 0, False),
     "waterway_stream": (114, "Text4B", None, 0, False),
