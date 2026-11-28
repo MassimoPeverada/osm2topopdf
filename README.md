@@ -63,8 +63,9 @@ Requires **Python 3.10 or higher** (tested on Python 3.13).
      python3 -m venv venv
      source venv/bin/activate
      ```
+     *(Note for Debian/Ubuntu Linux: if `venv` or `pip` is missing, run `sudo apt install python3-venv python3-pip` before creating the virtual environment.)*
 
-3. *(Optional)* **Ensure `pip` is installed** (if missing on your system):
+3. *(Optional)* **Ensure `pip` is installed** (if missing inside your environment):
    * **Windows:**
      ```cmd
      python -m ensurepip --upgrade
@@ -73,7 +74,6 @@ Requires **Python 3.10 or higher** (tested on Python 3.13).
      ```bash
      python3 -m ensurepip --upgrade
      ```
-     *(On Debian/Ubuntu Linux, you may also need `sudo apt install python3-pip python3-venv` before creating the virtual environment.)*
 
 4. **Install the required Python libraries:**
    ```cmd
